@@ -94,9 +94,10 @@ delivery on or before the waste date.
 2. Add these environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `DATABASE_URL` (transaction pooler, port 6543).
    The service role key is only needed locally for scripts.
-   - **Public demo:** also set `DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD`. The home page
-     then shows a **Try the demo** button that signs visitors into the demo shop.
-   - **Real shop:** leave those two unset and the demo button disappears.
+   - **Real shop:** that's all. Visitors see a **Sign in** button only.
+   - **Public demo:** also set `PUBLIC_DEMO=true`, `DEMO_USER_EMAIL` and
+     `DEMO_USER_PASSWORD`. The home page then shows **Open the demo shop**, which
+     signs visitors into the demo shop, and the demo shop's weekly figures.
 3. Deploy. Run migrations and seed from your machine against the same database.
 
 ## Screenshots

@@ -1,7 +1,9 @@
 "use client";
 
+import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { glide } from "@/lib/motion";
 
 const TABS = [
   { href: "/waste", label: "Waste" },
@@ -15,7 +17,7 @@ function useActive() {
   return (href: string) => pathname.startsWith(href);
 }
 
-/** Phone: tab bar within thumb reach. Hidden on wider screens. */
+/** Phone: tab bar within thumb reach. The leaf marker glides to the current tab. */
 export function BottomNav() {
   const isActive = useActive();
 
@@ -33,13 +35,16 @@ export function BottomNav() {
                   active ? "text-moss" : "text-soil-soft active:text-soil"
                 }`}
               >
-                {/* Small leaf marker on the current tab. */}
-                <span
-                  aria-hidden
-                  className={`h-1.5 w-3 rounded-[100%_0] transition-colors ${
-                    active ? "bg-moss" : "bg-transparent"
-                  }`}
-                />
+                <span className="grid h-1.5 w-3 place-items-center">
+                  {active && (
+                    <motion.span
+                      layoutId="bottom-nav-leaf"
+                      transition={glide}
+                      aria-hidden
+                      className="h-1.5 w-3 rounded-[100%_0] bg-moss"
+                    />
+                  )}
+                </span>
                 {tab.label}
               </Link>
             </li>
@@ -50,7 +55,7 @@ export function BottomNav() {
   );
 }
 
-/** Tablet/desktop: text links in the masthead, underlined when current. */
+/** Tablet/desktop: text links in the masthead; the underline glides between them. */
 export function TopNav() {
   const isActive = useActive();
 
@@ -60,18 +65,24 @@ export function TopNav() {
         {TABS.map((tab) => {
           const active = isActive(tab.href);
           return (
-            <li key={tab.href}>
+            <li key={tab.href} className="relative">
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`text-sm font-medium underline-offset-8 transition-colors ${
-                  active
-                    ? "text-soil underline decoration-moss decoration-2"
-                    : "text-soil-soft hover:text-soil hover:underline hover:decoration-hairline hover:decoration-2"
+                className={`block py-1 text-sm font-medium transition-colors ${
+                  active ? "text-soil" : "text-soil-soft hover:text-soil"
                 }`}
               >
                 {tab.label}
               </Link>
+              {active && (
+                <motion.span
+                  layoutId="top-nav-underline"
+                  transition={glide}
+                  aria-hidden
+                  className="absolute inset-x-0 -bottom-1 h-0.5 rounded-full bg-moss"
+                />
+              )}
             </li>
           );
         })}

@@ -18,6 +18,7 @@ export default async function WastePage() {
       .select({
         id: wasteEntries.id,
         flowerName: flowerTypes.name,
+        photoUrl: flowerTypes.photoUrl,
         quantity: wasteEntries.quantity,
         reason: wasteEntries.reason,
         wastedOn: wasteEntries.wastedOn,

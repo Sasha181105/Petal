@@ -6,6 +6,7 @@ import { TodayLabel } from "@/components/today-label";
 import { db } from "@/db";
 import { shopMembers, shops } from "@/db/schema";
 import { addDays, todayIn } from "@/lib/dates";
+import { change, formatMoney, formatShortDate } from "@/lib/format";
 import { findDemoShop, isDemoEnabled } from "@/lib/demo";
 import { periodSummary, type PeriodSummary } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
@@ -41,18 +42,7 @@ async function currentShop(userId: string): Promise<Shop | null> {
   return row ?? null;
 }
 
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-IE", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
-/** Percent change, or null when there's nothing to compare against. */
-function change(now: number, before: number) {
-  return before > 0 ? (now - before) / before : null;
-}
 
 export default async function Home() {
   const supabase = await createClient();
@@ -77,7 +67,7 @@ export default async function Home() {
   }
 
   const demo = isDemoEnabled();
-  const range = `${fmtShort(from)} – ${fmtShort(today)}`;
+  const range = `${formatShortDate(from)} – ${formatShortDate(today)}`;
 
   return (
     <div className="min-h-dvh">
@@ -99,6 +89,7 @@ export default async function Home() {
           </div>
         </header>
 
+        <main>
         {/* Hero */}
         <section className="grid gap-10 pb-20 pt-16 md:grid-cols-12 md:pb-28 md:pt-24">
           <div className="md:col-span-8">
@@ -134,13 +125,24 @@ export default async function Home() {
                     <span className="transition-transform group-hover:translate-x-1">→</span>
                   </button>
                 </form>
-              ) : null}
-              <Link
-                href={user ? "/dashboard" : "/login"}
-                className="text-base font-medium text-soil underline decoration-hairline decoration-2 underline-offset-8 transition-colors hover:decoration-rose-deep"
-              >
-                {user ? "See this week in detail" : "Sign in to your shop"}
-              </Link>
+              ) : (
+                // Real shop, signed out: signing in is the one thing to do here.
+                <Link
+                  href="/login"
+                  className="group inline-flex h-14 items-center gap-3 rounded-full bg-moss px-8 text-base font-medium text-linen transition-colors hover:bg-moss-deep focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-moss"
+                >
+                  Sign in
+                  <span className="transition-transform group-hover:translate-x-1">→</span>
+                </Link>
+              )}
+              {(user || demo) && (
+                <Link
+                  href={user ? "/dashboard" : "/login"}
+                  className="text-base font-medium text-soil underline decoration-hairline decoration-2 underline-offset-8 transition-colors hover:decoration-rose-deep"
+                >
+                  {user ? "See this week in detail" : "Sign in to your shop"}
+                </Link>
+              )}
             </div>
           </div>
 
@@ -217,6 +219,8 @@ export default async function Home() {
           </ol>
         </section>
 
+        </main>
+
         <footer className="flex flex-wrap justify-between gap-2 border-t border-hairline py-6 font-mono text-[11px] uppercase tracking-[0.18em] text-soil-soft">
           <span>Petal · a waste ledger for florists</span>
           <span>Prices per stem, as delivered</span>
@@ -226,13 +230,6 @@ export default async function Home() {
   );
 }
 
-function fmtShort(date: string) {
-  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    timeZone: "UTC",
-  });
-}
 
 function Figure({
   label,

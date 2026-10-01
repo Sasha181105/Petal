@@ -72,7 +72,8 @@ export function FlowerPhoto({ url, name, variant, className = "", priority }: Pr
   );
 }
 
-function LoadedImage({
+/** Image with a blurred stand-in that fades out once the real one has loaded. */
+export function LoadedImage({
   src,
   srcSet,
   sizes,
@@ -80,6 +81,7 @@ function LoadedImage({
   alt,
   priority,
   className,
+  fit = "cover",
 }: {
   src: string;
   srcSet: string;
@@ -88,6 +90,8 @@ function LoadedImage({
   alt: string;
   priority?: boolean;
   className: string;
+  /** cover = cropped tile; contain = whole photo (enlarged view). */
+  fit?: "cover" | "contain";
 }) {
   const [loaded, setLoaded] = useState(false);
   const img = useRef<HTMLImageElement>(null);
@@ -98,10 +102,10 @@ function LoadedImage({
   }, [src]);
 
   return (
-    <span className={`relative block shrink-0 overflow-hidden bg-linen-deep ${className}`}>
+    <span className={`relative block shrink-0 overflow-hidden ${fit === "cover" ? "bg-linen-deep" : ""} ${className}`}>
       <span
         aria-hidden
-        className={`absolute inset-0 scale-110 bg-cover bg-center blur-md transition-opacity duration-500 ${
+        className={`absolute inset-0 bg-center bg-no-repeat blur-md transition-opacity duration-500 ${fit === "cover" ? "scale-110 bg-cover" : "bg-contain"} ${
           loaded ? "opacity-0" : "opacity-100"
         }`}
         style={{ backgroundImage: `url("${blur}")` }}
@@ -116,7 +120,7 @@ function LoadedImage({
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`relative size-full object-cover transition-opacity duration-500 ${
+        className={`relative size-full transition-opacity duration-500 ${fit === "cover" ? "object-cover" : "object-contain"} ${
           loaded ? "opacity-100" : "opacity-0"
         }`}
       />

@@ -21,6 +21,11 @@
   --color-rose-deep: #9a5b58;
   --color-rose-wash: #f1e1dc;
 
+  /* Chart marks only: one step more saturated than clay / rose-deep so thin
+     lines and bars don't read as grey (passes the dataviz chroma floor). */
+  --color-chart-money: #a0532f;
+  --color-chart-rate: #a85a56;
+
   --animate-rise: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-draw: draw 2.4s cubic-bezier(0.45, 0, 0.2, 1) both;
   --animate-drift: drift 7s ease-in-out infinite;
@@ -70,10 +75,11 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.18 0 0 0 0 0.16 0 0 0 0 0.12 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Buttons: flat pills, colour change only. No shadows, no lifting. */
+/* Buttons: flat pills. Colour shifts on hover, a slight press on tap. */
 @utility btn {
   @apply inline-flex items-center justify-center gap-2 rounded-full px-6 font-medium
-    transition-colors duration-150 select-none
+    transition-[color,background-color,border-color,transform] duration-150 select-none
+    active:scale-[0.97]
     focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-moss
     disabled:pointer-events-none disabled:opacity-40;
 }
@@ -90,7 +96,7 @@ body {
 /* Selectable tile (flowers, quantities). */
 @utility chip {
   @apply rounded-lg border border-hairline bg-linen/60 font-medium text-soil
-    transition-colors duration-150
+    transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97]
     hover:border-moss hover:bg-sage-wash active:bg-sage-wash;
 }
 

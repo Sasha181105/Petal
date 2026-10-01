@@ -5,10 +5,12 @@ import { shops } from "@/db/schema";
 import { DEMO_SHOP_NAME } from "./demo-shop";
 
 /**
- * The one-click public demo is on only when demo credentials are set.
- * Leave DEMO_USER_EMAIL / DEMO_USER_PASSWORD unset for a real shop's deployment.
+ * The public demo (one-click "Open the demo shop" and sample figures on the
+ * home page) is off unless PUBLIC_DEMO=true. The demo credentials alone don't
+ * turn it on: the seed script needs them on every machine.
  */
 export const isDemoEnabled = () =>
+  process.env.PUBLIC_DEMO === "true" &&
   Boolean(process.env.DEMO_USER_EMAIL && process.env.DEMO_USER_PASSWORD);
 
 /** The seeded demo shop, used for the public home page figures. */

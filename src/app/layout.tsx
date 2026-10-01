@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Instrument_Serif } from "next/font/google";
+import { MotionProvider } from "@/components/motion-provider";
 import "./globals.css";
 
 // Expressive serif for headings and figures; calm, legible sans/mono for the UI.
@@ -37,7 +38,9 @@ export default function RootLayout({
   const fonts = [instrument, plexSans, plexMono].map((f) => f.variable).join(" ");
   return (
     <html lang="en" className={fonts}>
-      <body className="paper min-h-dvh font-sans text-soil antialiased">{children}</body>
+      <body className="paper min-h-dvh font-sans text-soil antialiased">
+        <MotionProvider>{children}</MotionProvider>
+      </body>
     </html>
   );
 }
