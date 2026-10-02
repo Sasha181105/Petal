@@ -11,18 +11,18 @@ import { RecentDeliveries } from "./recent-deliveries";
 const RECENT_LIMIT = 15;
 
 export default async function DeliveriesPage() {
-  const { shop } = await requireShop();
+  const { shop, role } = await requireShop();
 
   if (!shop.deliveriesEnabled) {
     return (
       <>
         <PageTitle title="Deliveries" accent="optional." />
-        <DeliveriesIntro />
+        <DeliveriesIntro canEnable={role === "manager"} />
       </>
     );
   }
 
-  const [flowers, supplierRows, latest, recent, usual] = await Promise.all([
+  const [flowers, supplierRows, latest, recent] = await Promise.all([
     listFlowerTypes(shop.id),
     db
       .select({ id: suppliers.id, name: suppliers.name })
@@ -51,16 +51,11 @@ export default async function DeliveriesPage() {
       .where(eq(deliveries.shopId, shop.id))
       .orderBy(desc(deliveries.receivedOn), desc(deliveries.createdAt))
       .limit(RECENT_LIMIT),
-    db
-      .select({ id: flowerTypes.id, cents: flowerTypes.unitCostCents })
-      .from(flowerTypes)
-      .where(eq(flowerTypes.shopId, shop.id)),
   ]);
 
   const lastPrices: Record<string, LastPrice> = Object.fromEntries(
     latest.map((r) => [r.flower_type_id, { unitCostCents: Number(r.unit_cost_cents), supplierId: r.supplier_id }]),
   );
-  const usualPrices = Object.fromEntries(usual.map((r) => [r.id, r.cents]));
 
   return (
     <>
@@ -77,7 +72,6 @@ export default async function DeliveriesPage() {
             flowers={flowers}
             suppliers={supplierRows}
             lastPrices={lastPrices}
-            usualPrices={usualPrices}
             currency={shop.currency}
           />
         </section>

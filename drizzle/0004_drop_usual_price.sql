@@ -1,0 +1,1 @@
+ALTER TABLE "flower_types" DROP COLUMN "unit_cost_cents";

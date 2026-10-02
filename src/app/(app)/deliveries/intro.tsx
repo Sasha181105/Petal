@@ -3,12 +3,12 @@ import { GetStartedButton } from "./get-started";
 
 const GAINS = [
   {
-    title: "Waste rate per flower",
-    text: "The share of each delivery that ends up in the bin. 12% of roses, 39% of tulips: the number that tells you what to order less of.",
+    title: "Money lost",
+    text: "Every binned stem priced at what you paid for it in that delivery: per flower, per week, in the dashboard and the PDF reports.",
   },
   {
-    title: "Money lost at real prices",
-    text: "Waste is priced at what you actually paid for that delivery, not a usual price you set once.",
+    title: "Waste rate per flower",
+    text: "The share of each delivery that ends up in the bin. 12% of roses, 39% of tulips: the number that tells you what to order less of.",
   },
   {
     title: "Delivered vs binned",
@@ -27,14 +27,14 @@ const STAYS = [
 ];
 
 /** Shown on the Deliveries tab while the feature is off. */
-export function DeliveriesIntro() {
+export function DeliveriesIntro({ canEnable }: { canEnable: boolean }) {
   return (
     <div className="grid gap-16 lg:grid-cols-12 lg:gap-12">
       <div className="lg:col-span-7">
         <p className="max-w-xl text-lg leading-relaxed text-soil-soft">
-          Deliveries are an <em className="text-soil">optional</em> part of Petal. Without them, waste
-          is priced at each flower&apos;s usual price. With them, you also see how much of each
-          delivery gets thrown away.
+          Deliveries are an <em className="text-soil">optional</em> part of Petal. Without them, Petal
+          counts stems: what was binned, when and why. Money needs your purchase prices, so with
+          deliveries on you also see what waste cost and how much of each delivery was thrown away.
         </p>
 
         <h2 className="label-caps mt-12">What changes when you turn it on</h2>
@@ -61,7 +61,13 @@ export function DeliveriesIntro() {
         </ul>
 
         <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-soil pt-8">
-          <GetStartedButton />
+          {canEnable ? (
+            <GetStartedButton />
+          ) : (
+            <p className="max-w-sm border-l-2 border-hairline pl-4 text-sm text-soil-soft">
+              Only a manager can turn deliveries on. Ask yours if the shop would like to use them.
+            </p>
+          )}
           <Link
             href="/dashboard"
             className="text-base font-medium underline decoration-hairline decoration-2 underline-offset-8 hover:decoration-rose-deep"
@@ -77,14 +83,14 @@ export function DeliveriesIntro() {
           <p className="label-caps">Preview · sample figures</p>
           <div className="mt-6 grid grid-cols-2 border-t border-hairline pt-5">
             <div>
+              <p className="label-caps">Money lost</p>
+              <p className="mt-2 font-serif text-6xl leading-none text-clay">€699</p>
+              <p className="mt-2 text-sm text-soil-soft">last 30 days</p>
+            </div>
+            <div className="border-l border-hairline pl-5">
               <p className="label-caps">Waste rate</p>
               <p className="mt-2 font-serif text-6xl leading-none text-rose-deep">12%</p>
               <p className="mt-2 text-sm text-soil-soft">of 5,825 delivered</p>
-            </div>
-            <div className="border-l border-hairline pl-5">
-              <p className="label-caps">Stems delivered</p>
-              <p className="mt-2 font-serif text-6xl leading-none">5,825</p>
-              <p className="mt-2 text-sm text-soil-soft">last 30 days</p>
             </div>
           </div>
           <ul className="mt-6 space-y-3 border-t border-hairline pt-5 text-sm">

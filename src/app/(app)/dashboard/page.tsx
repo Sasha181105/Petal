@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { todayIn } from "@/lib/dates";
 import { change, formatMoney, formatNumber, formatPercent, formatShortDate } from "@/lib/format";
-import { requireShop } from "@/lib/shop";
+import { requireManagerPage } from "@/lib/shop";
 import { flowerStats, periodSummary, scopeOf, wasteTrend } from "@/lib/stats";
 import { DashboardFrame } from "./dashboard-frame";
 import { AllFlowers } from "./flower-table";
@@ -15,7 +15,8 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
-  const { shop } = await requireShop();
+  // Analytics are for managers; staff are sent to the waste log.
+  const { shop } = await requireManagerPage();
   const scope = scopeOf(shop);
   const today = todayIn();
   const range = parseRange(await searchParams, today);
@@ -43,67 +44,86 @@ export default async function DashboardPage({
   }));
 
   const vs = `vs previous ${range.days} days`;
-  const deliveries = shop.deliveriesEnabled;
+  // Purchase prices only come from deliveries: without them, stems only.
+  const money = shop.deliveriesEnabled;
   const empty = now.wastedStems === 0;
+  const period = `${formatShortDate(range.from)} – ${formatShortDate(range.to)}`;
 
   return (
     <>
       <PageTitle title="Waste" accent="report." />
+      <Link
+        href="/weeks"
+        className="-mt-4 mb-6 inline-block text-sm underline decoration-hairline decoration-2 underline-offset-8 hover:decoration-moss md:-mt-6 print:hidden"
+      >
+        Weekly reports (PDF) →
+      </Link>
       <DashboardFrame range={range} today={today}>
         {/* The headline: one big number, one or two quiet ones beside it. */}
         <section className="grid gap-10 border-t border-soil pt-6 md:grid-cols-12">
-          <div className="md:col-span-6">
-            <p className="label-caps">
-              Money lost · {formatShortDate(range.from)} – {formatShortDate(range.to)}
-            </p>
-            <p className="mt-3 font-serif text-7xl leading-none text-clay md:text-9xl">
-              {formatMoney(now.lostCents, shop.currency)}
-            </p>
-            <Delta value={change(now.lostCents, before.lostCents)} vs={vs} />
-          </div>
+          {money ? (
+            <div className="md:col-span-6">
+              <p className="label-caps">Money lost · {period}</p>
+              <p className="mt-3 font-serif text-7xl leading-none text-clay md:text-9xl">
+                {formatMoney(now.lostCents, shop.currency)}
+              </p>
+              <Delta value={change(now.lostCents, before.lostCents)} vs={vs} />
+            </div>
+          ) : (
+            <div className="md:col-span-6">
+              <p className="label-caps">Stems binned · {period}</p>
+              <p className="mt-3 font-serif text-7xl leading-none text-clay md:text-9xl">
+                {formatNumber(now.wastedStems)}
+              </p>
+              <Delta value={change(now.wastedStems, before.wastedStems)} vs={vs} />
+            </div>
+          )}
 
           <dl className="grid grid-cols-2 content-end gap-6 md:col-span-6">
-            <Small
-              label="Stems binned"
-              value={formatNumber(now.wastedStems)}
-              delta={<Delta value={change(now.wastedStems, before.wastedStems)} vs="" compact />}
-            />
-            {deliveries ? (
-              <Small
-                label="Waste rate"
-                value={now.wasteRate === null ? "—" : formatPercent(now.wasteRate)}
-                tone="text-rose-deep"
-                delta={
-                  <span className="text-sm text-soil-soft">
-                    of {formatNumber(now.deliveredStems)} delivered
-                  </span>
-                }
-              />
+            {money ? (
+              <>
+                <Small
+                  label="Stems binned"
+                  value={formatNumber(now.wastedStems)}
+                  delta={<Delta value={change(now.wastedStems, before.wastedStems)} vs="" compact />}
+                />
+                <Small
+                  label="Waste rate"
+                  value={now.wasteRate === null ? "—" : formatPercent(now.wasteRate)}
+                  tone="text-rose-deep"
+                  delta={<span className="text-sm text-soil-soft">of {formatNumber(now.deliveredStems)} delivered</span>}
+                />
+              </>
             ) : (
-              <Small
-                label="Costliest flower"
-                value={now.worstFlower?.name ?? "—"}
-                tone="text-moss italic"
-                delta={
-                  now.worstFlower && (
-                    <span className="text-sm text-soil-soft">
-                      {formatMoney(now.worstFlower.lostCents, shop.currency)} lost
-                    </span>
-                  )
-                }
-              />
+              <>
+                <Small
+                  label="Most binned"
+                  value={now.mostBinned?.name ?? "—"}
+                  tone="text-moss italic"
+                  delta={
+                    now.mostBinned && (
+                      <span className="text-sm text-soil-soft">{formatNumber(now.mostBinned.stems)} stems</span>
+                    )
+                  }
+                />
+                <Small
+                  label="Per day"
+                  value={formatNumber(Math.round(now.wastedStems / range.days))}
+                  delta={<span className="text-sm text-soil-soft">stems on average</span>}
+                />
+              </>
             )}
           </dl>
         </section>
 
-        {/* Honest about gaps in the money figure. */}
-        {now.unpricedFlowers > 0 && (
+        {/* Honest about gaps in the money figure: waste of a flower never delivered has no price. */}
+        {money && now.unpricedFlowers > 0 && (
           <p className="mt-8 max-w-3xl border-l-2 border-clay bg-clay-wash px-4 py-3 text-sm">
             {now.unpricedFlowers === 1 ? "1 flower" : `${now.unpricedFlowers} flowers`} binned in this
-            period {now.unpricedFlowers === 1 ? "has" : "have"} no price, so money lost is lower than it
-            really is.{" "}
-            <Link href="/flowers" className="font-medium underline decoration-2 underline-offset-4">
-              Set prices
+            period {now.unpricedFlowers === 1 ? "has" : "have"} no delivery logged, so there&apos;s no price
+            for {now.unpricedFlowers === 1 ? "it" : "them"} and money lost is lower than it really is.{" "}
+            <Link href="/deliveries" className="font-medium underline decoration-2 underline-offset-4">
+              Log a delivery
             </Link>
           </p>
         )}
@@ -115,24 +135,25 @@ export default async function DashboardPage({
         ) : (
           <>
             <section className="mt-20">
-              <TrendChart rows={trendRows} currency={shop.currency} unit={range.unit} />
+              <TrendChart rows={trendRows} currency={shop.currency} unit={range.unit} money={money} />
             </section>
 
             <section className="mt-20 max-w-3xl">
-              <TopFive flowers={flowers} currency={shop.currency} rates={deliveries} />
+              <TopFive flowers={flowers} currency={shop.currency} money={money} />
             </section>
 
             <section className="mt-20">
-              <AllFlowers flowers={flowers} currency={shop.currency} deliveries={deliveries} />
+              <AllFlowers flowers={flowers} currency={shop.currency} money={money} />
             </section>
           </>
         )}
 
-        {!deliveries && (
+        {!money && (
           <p className="mt-16 border-t border-hairline pt-6 text-sm text-soil-soft">
-            Want to know what share of each delivery gets thrown away?{" "}
+            Counting stems only. To see money lost and waste rate, Petal needs your purchase
+            prices:{" "}
             <Link href="/deliveries" className="text-soil underline decoration-hairline decoration-2 underline-offset-4 hover:decoration-moss">
-              Deliveries are optional — see what they add
+              deliveries are optional — see what they add
             </Link>
           </p>
         )}

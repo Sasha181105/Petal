@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Botanical } from "@/components/botanical";
 import { Logo } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
@@ -47,6 +48,15 @@ export default async function LoginPage({
             </p>
           )}
           <LoginForm />
+          <p className="mt-6 text-sm text-soil-soft">
+            Running a shop that isn&apos;t on Petal yet?{" "}
+            <Link
+              href="/signup"
+              className="font-medium text-soil underline decoration-hairline decoration-2 underline-offset-4 hover:decoration-moss"
+            >
+              Create a manager account
+            </Link>
+          </p>
 
           {isDemoEnabled() && (
             <form action={signInDemo} className="mt-8 border-t border-hairline pt-6">

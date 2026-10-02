@@ -5,12 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { glide } from "@/lib/motion";
 
-const TABS = [
+type NavProps = { deliveriesEnabled: boolean; isManager: boolean };
+
+const ALL_TABS = [
   { href: "/waste", label: "Waste" },
   { href: "/deliveries", label: "Deliveries" },
   { href: "/flowers", label: "Flowers" },
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard", label: "Dashboard", managerOnly: true },
 ];
+
+/** Staff don't see the analytics tab. */
+const tabsFor = (isManager: boolean) => ALL_TABS.filter((t) => isManager || !t.managerOnly);
 
 function useActive() {
   const pathname = usePathname();
@@ -21,13 +26,14 @@ function useActive() {
 const isOff = (href: string, deliveriesEnabled: boolean) => href === "/deliveries" && !deliveriesEnabled;
 
 /** Phone: tab bar within thumb reach. The leaf marker glides to the current tab. */
-export function BottomNav({ deliveriesEnabled }: { deliveriesEnabled: boolean }) {
+export function BottomNav({ deliveriesEnabled, isManager }: NavProps) {
   const isActive = useActive();
+  const tabs = tabsFor(isManager);
 
   return (
-    <nav className="paper fixed inset-x-0 bottom-0 border-t border-soil pb-[env(safe-area-inset-bottom)] md:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-4">
-        {TABS.map((tab) => {
+    <nav className="paper fixed inset-x-0 bottom-0 print:hidden border-t border-soil pb-[env(safe-area-inset-bottom)] md:hidden">
+      <ul className={`mx-auto grid max-w-lg ${tabs.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+        {tabs.map((tab) => {
           const active = isActive(tab.href);
           return (
             <li key={tab.href}>
@@ -59,13 +65,14 @@ export function BottomNav({ deliveriesEnabled }: { deliveriesEnabled: boolean })
 }
 
 /** Tablet/desktop: text links in the masthead; the underline glides between them. */
-export function TopNav({ deliveriesEnabled }: { deliveriesEnabled: boolean }) {
+export function TopNav({ deliveriesEnabled, isManager }: NavProps) {
   const isActive = useActive();
+  const tabs = tabsFor(isManager);
 
   return (
-    <nav className="hidden md:block">
+    <nav className="hidden md:block print:hidden">
       <ul className="flex gap-8">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = isActive(tab.href);
           return (
             <li key={tab.href} className="relative">

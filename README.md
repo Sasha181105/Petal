@@ -11,8 +11,8 @@ flower type, money lost, the worst performers and the trend over time.
 Requires Node.js 20+.
 
 1. **Create a Supabase project** at [supabase.com](https://supabase.com).
-   Under *Authentication → Sign In / Providers*, keep Email enabled and turn
-   **off** "Allow new users to sign up": accounts are created by script.
+   Under *Authentication → Sign In / Providers*, keep Email enabled and leave
+   **"Allow new users to sign up" on**: shop managers register at `/signup`.
 
 2. **Configure environment**
 
@@ -60,9 +60,58 @@ How it works:
 - **Without photos.** Flowers without a photo get a tinted placeholder. If the
   Cloudinary keys aren't set, uploads are hidden and everything else works.
 
-## Adding real users
+## Weeks and weekly reports
 
-There's no public sign-up. To give someone access:
+Weeks run **Monday to Sunday** (Europe/Dublin) and open and close by themselves.
+
+- **Logging:** waste can only be logged in the **open week**. The server checks this,
+  not just the date picker. Entries in closed weeks can't be deleted.
+- **Corrections:** a **manager** can reopen a past week on the **Weeks** page, then
+  close it again.
+- **Reports:** every closed week has a **PDF report**, from `/weeks/<monday>/report`.
+  It holds the headline figures vs the week before, the five worst flowers, every
+  flower by reason, and every entry with who logged it.
+
+The PDF is rendered on the server with `@react-pdf/renderer`, using the TTF fonts in
+`src/assets/fonts`.
+
+## Accounts, roles and passwords
+
+| | Staff | Manager |
+|---|---|---|
+| Log waste and deliveries, manage flowers | ✓ | ✓ |
+| Change own password | ✓ | ✓ |
+| Dashboard, weekly PDF reports, money figures | | ✓ |
+| Turn features on/off, manage the team, reopen weeks | | ✓ |
+
+- **Managers sign up themselves** at `/signup` (shop name, currency, email,
+  password). The account becomes the manager of a new shop, created on first
+  sign-in. If Supabase asks people to confirm their email, the shop is created
+  after they follow the link. A short **Welcome** page lists the first steps.
+- **Staff can't sign up.** Managers add them in **Settings → Team**, either by
+  emailing an invitation or by setting a temporary password to hand over in person.
+- **Forgot password:** the link on the sign-in page emails a one-time link.
+- **Sign-in protection:** after 5 wrong passwords in 15 minutes, that email is
+  locked for 15 minutes.
+
+**Supabase setup for email links** (password reset, invitations):
+1. **Authentication → URL Configuration:** set **Site URL** to your site. Add
+   `http://localhost:3000/**` and `https://<your-site>/**` to **Redirect URLs**.
+2. **Email templates.** In **Authentication → Emails → Templates**, paste the Petal
+   templates from `supabase/templates/`. Each file's first comment gives its subject
+   line:
+   - `confirm-signup.html` → **Confirm signup**
+   - `invite.html` → **Invite user**
+   - `recovery.html` → **Reset password**
+3. **Email delivery.** Supabase's built-in email is for testing only: it sends a
+   few emails an hour and only to your Supabase team's addresses. For real staff,
+   add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
+   Resend or Postmark). Until then, use **Set a password now** when adding staff.
+
+## Adding users from the command line
+
+Normally managers sign up at `/signup` and add their own staff. For setting up a
+shop by hand, this creates a manager account:
 
 ```bash
 npm run user:add -- anna@example.com "a-strong-password" "Anna's Flowers"
@@ -91,18 +140,21 @@ Waste logging works on its own. The delivery log is an optional feature, turned
 on per shop in **Settings** (off for new shops). While it's off, the Deliveries
 tab explains what it adds and offers **Get started**.
 
-**Money lost** = stems wasted × a price per stem:
-- **Deliveries on:** the price from that flower's most recent delivery on or before
-  the waste date (else the earliest one after it). If the flower has no delivery,
-  its usual price is used.
-- **Deliveries off:** the flower's **usual price per stem**, set on its flower card.
-  Logging a delivery also updates this price.
+Purchase prices only exist in deliveries, so the setting decides whether Petal
+shows money at all:
 
-Flowers with no price at all are flagged on the dashboard, because money lost
-undercounts them.
+- **Deliveries off: stems only.** The dashboard, weekly PDFs, home page, Weeks page
+  and flower cards count stems binned (total, per day, most binned flower, by
+  reason). No prices are asked for or shown.
+- **Deliveries on: money and waste rate too.**
+  - **Money lost** = stems binned × the price from that flower's most recent
+    delivery on or before the waste date (else the earliest one after it).
+  - If a flower was binned but never delivered, it has no price. The dashboard and
+    PDF flag it, because money lost undercounts it.
+  - **Waste rate** = stems binned ÷ stems delivered in the period.
 
-**Waste rate** (stems binned ÷ stems delivered in the period) needs deliveries, so
-the dashboard only shows it when they're on.
+Switching deliveries off hides the log and every money figure. Nothing is deleted:
+switch it back on and the figures return.
 
 ## Deploying to Vercel
 

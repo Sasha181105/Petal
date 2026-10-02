@@ -1,8 +1,10 @@
-﻿import { createServerClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // The home page and login are open to everyone; the rest needs a session.
-const isPublic = (pathname: string) => pathname === "/" || pathname.startsWith("/login");
+const PUBLIC_PREFIXES = ["/login", "/signup", "/forgot-password", "/auth/"];
+const isPublic = (pathname: string) =>
+  pathname === "/" || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 
 // Refreshes the Supabase session cookie on every request and keeps
 // signed-out visitors on the login page.
@@ -39,7 +41,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   // An ?error on /login (e.g. no-shop) must be shown, not bounced back.
-  if (user && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
+  if (user && (pathname === "/login" || pathname === "/signup") && !request.nextUrl.searchParams.has("error")) {
     return NextResponse.redirect(new URL("/waste", request.url));
   }
 

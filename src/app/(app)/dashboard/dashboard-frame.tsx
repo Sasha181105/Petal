@@ -38,7 +38,7 @@ export function DashboardFrame({ range, today, children }: Props) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-t border-hairline py-4">
+      <div className="flex flex-wrap items-center gap-2 border-t border-hairline py-4 print:hidden">
         <span className="label-caps mr-2 w-full sm:w-auto">Period</span>
         {PRESETS.map((p) => (
           <button

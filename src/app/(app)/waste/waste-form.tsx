@@ -43,7 +43,8 @@ function Check() {
   );
 }
 
-export function WasteForm({ flowers }: { flowers: FlowerOption[] }) {
+/** `minDate`: Monday of the earliest open week; older days are closed. */
+export function WasteForm({ flowers, minDate }: { flowers: FlowerOption[]; minDate: string }) {
   const [flower, setFlower] = useState<FlowerOption | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState<WasteReason | null>(null);
@@ -174,6 +175,7 @@ export function WasteForm({ flowers }: { flowers: FlowerOption[] }) {
               <input
                 type="date"
                 value={date}
+                min={minDate}
                 max={localToday()}
                 onChange={(e) => setDate(e.target.value || null)}
                 aria-label="Date"

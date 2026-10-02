@@ -22,8 +22,6 @@ type Props = {
   flowers: FlowerOption[];
   suppliers: Supplier[];
   lastPrices: Record<string, LastPrice>;
-  /** Usual price per stem per flower (used when there's no delivery yet). */
-  usualPrices: Record<string, number | null>;
   currency: string;
 };
 
@@ -37,7 +35,7 @@ function parseCents(text: string): number | null {
 
 const centsToText = (c: number) => (c / 100).toFixed(2);
 
-export function DeliveryForm({ flowers, suppliers: initialSuppliers, lastPrices, usualPrices, currency }: Props) {
+export function DeliveryForm({ flowers, suppliers: initialSuppliers, lastPrices, currency }: Props) {
   const [flower, setFlower] = useState<FlowerOption | null>(null);
   const [quantity, setQuantity] = useState(10);
   const [price, setPrice] = useState("");
@@ -55,7 +53,7 @@ export function DeliveryForm({ flowers, suppliers: initialSuppliers, lastPrices,
     setFlower(f);
     if (!f) return;
     const last = lastPrices[f.id];
-    const cents = last?.unitCostCents ?? usualPrices[f.id] ?? null;
+    const cents = last?.unitCostCents ?? null;
     setPrice(cents === null ? "" : centsToText(cents));
     if (last?.supplierId) setSupplierId(last.supplierId);
   }

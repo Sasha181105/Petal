@@ -17,7 +17,7 @@ const ALL_COLUMNS: Column[] = [
   { key: "deliveredStems", label: "Delivered", numeric: true, wide: true, needsDeliveries: true },
   { key: "wastedStems", label: "Binned", numeric: true, wide: true },
   { key: "wasteRate", label: "Waste rate", numeric: true, needsDeliveries: true },
-  { key: "lostCents", label: "Lost", numeric: true },
+  { key: "lostCents", label: "Lost", numeric: true, needsDeliveries: true },
 ];
 
 function compare(a: FlowerStats, b: FlowerStats, key: Key) {
@@ -26,15 +26,17 @@ function compare(a: FlowerStats, b: FlowerStats, key: Key) {
   return (a[key] ?? -1) - (b[key] ?? -1);
 }
 
-type Props = { flowers: FlowerStats[]; currency: string; deliveries: boolean };
+/** `money`: deliveries are on, so there are prices: money and waste rate columns. */
+type Props = { flowers: FlowerStats[]; currency: string; money: boolean };
 
 /**
  * Every flower in the period, folded away by default to keep the dashboard
  * short. Doubles as the table view of the charts above.
  */
-export function AllFlowers({ flowers, currency, deliveries }: Props) {
+export function AllFlowers({ flowers, currency, money }: Props) {
+  const deliveries = money;
   const [open, setOpen] = useState(false);
-  const [sort, setSort] = useState<Sort>({ key: "lostCents", desc: true });
+  const [sort, setSort] = useState<Sort>({ key: money ? "lostCents" : "wastedStems", desc: true });
   const columns = ALL_COLUMNS.filter((c) => deliveries || !c.needsDeliveries);
   // On phones the wide columns fold into the name cell, but binned must stay
   // visible when it's one of only three columns.
@@ -78,9 +80,10 @@ export function AllFlowers({ flowers, currency, deliveries }: Props) {
               </p>
             ) : (
               <p className="max-w-2xl text-sm text-soil-soft">
-                Money lost uses each flower&apos;s usual price per stem, set on its{" "}
-                <Link href="/flowers" className="underline decoration-hairline decoration-2 underline-offset-4 hover:decoration-moss">
-                  flower card
+                Stems binned per flower, by count. Money lost needs purchase prices, which come
+                from{" "}
+                <Link href="/deliveries" className="underline decoration-hairline decoration-2 underline-offset-4 hover:decoration-moss">
+                  deliveries
                 </Link>
                 .
               </p>
@@ -125,8 +128,8 @@ export function AllFlowers({ flowers, currency, deliveries }: Props) {
                         <span className="min-w-0">
                           <span className="block truncate font-medium">
                             {f.name}
-                            {!f.priced && (
-                              <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.14em] text-clay">no price</span>
+                            {money && !f.priced && (
+                              <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.14em] text-clay">no delivery</span>
                             )}
                           </span>
                           {deliveries && (
@@ -156,7 +159,9 @@ export function AllFlowers({ flowers, currency, deliveries }: Props) {
                         </span>
                       </td>
                     )}
-                    <td className="py-2.5 pl-3 text-right font-medium">{formatMoney(f.lostCents, currency)}</td>
+                    {money && (
+                      <td className="py-2.5 pl-3 text-right font-medium">{formatMoney(f.lostCents, currency)}</td>
+                    )}
                   </motion.tr>
                 ))}
               </tbody>

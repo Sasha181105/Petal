@@ -7,7 +7,7 @@ import { formatMoney, formatNumber, formatPercent } from "@/lib/format";
 import { gentle, glide, quick } from "@/lib/motion";
 import type { FlowerStats } from "@/lib/stats";
 
-type Mode = "money" | "rate";
+type Mode = "money" | "rate" | "stems";
 
 /** Below this, a percentage is noise (1 of 2 stems = 50%). */
 const MIN_DELIVERED_FOR_RATE = 20;
@@ -17,28 +17,37 @@ const MODES: { key: Mode; label: string }[] = [
   { key: "rate", label: "By waste rate" },
 ];
 
-/** `rates`: deliveries are on, so ranking by waste rate is possible. */
+/**
+ * `money`: deliveries are on, so flowers rank by money lost (or waste rate).
+ * Without deliveries there are no prices: they rank by stems binned.
+ */
 export function TopFive({
   flowers,
   currency,
-  rates,
+  money,
 }: {
   flowers: FlowerStats[];
   currency: string;
-  rates: boolean;
+  money: boolean;
 }) {
-  const [mode, setMode] = useState<Mode>("money");
+  const [picked, setMode] = useState<Mode>("money");
+  const mode: Mode = money ? picked : "stems";
+  const rates = money;
 
   const ranked =
     mode === "money"
       ? flowers.filter((f) => f.lostCents > 0).sort((a, b) => b.lostCents - a.lostCents)
-      : flowers
-          .filter((f) => f.wasteRate !== null && f.deliveredStems >= MIN_DELIVERED_FOR_RATE)
-          .sort((a, b) => b.wasteRate! - a.wasteRate!);
+      : mode === "stems"
+        ? flowers.filter((f) => f.wastedStems > 0).sort((a, b) => b.wastedStems - a.wastedStems)
+        : flowers
+            .filter((f) => f.wasteRate !== null && f.deliveredStems >= MIN_DELIVERED_FOR_RATE)
+            .sort((a, b) => b.wasteRate! - a.wasteRate!);
   const top = ranked.slice(0, 5);
-  const value = (f: FlowerStats) => (mode === "money" ? f.lostCents : f.wasteRate!);
+  const value = (f: FlowerStats) => (mode === "money" ? f.lostCents : mode === "stems" ? f.wastedStems : f.wasteRate!);
   const max = Math.max(...top.map(value), 1e-9);
-  const barColor = mode === "money" ? "bg-chart-money" : "bg-chart-rate";
+  const barColor = mode === "rate" ? "bg-chart-rate" : "bg-chart-money";
+  const display = (f: FlowerStats) =>
+    mode === "money" ? formatMoney(f.lostCents, currency) : mode === "stems" ? formatNumber(f.wastedStems) : formatPercent(f.wasteRate!);
 
   return (
     <div>
@@ -74,9 +83,9 @@ export function TopFive({
 
       {top.length === 0 ? (
         <p className="mt-6 border-t border-hairline py-6 text-soil-soft">
-          {mode === "money"
-            ? "No waste in this period."
-            : `No flower had ${MIN_DELIVERED_FOR_RATE}+ stems delivered in this period.`}
+          {mode === "rate"
+            ? `No flower had ${MIN_DELIVERED_FOR_RATE}+ stems delivered in this period.`
+            : "No waste in this period."}
         </p>
       ) : (
         <ol className="mt-6 border-t border-soil">
@@ -100,7 +109,7 @@ export function TopFive({
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-soil-soft">
                       {rates
                         ? `${formatNumber(f.wastedStems)} / ${formatNumber(f.deliveredStems)} stems`
-                        : `${formatNumber(f.wastedStems)} stems binned`}
+                        : "stems binned"}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-3 pl-9">
@@ -115,7 +124,7 @@ export function TopFive({
                     </div>
                     {/* Value at the tip, in text ink — never the bar colour. */}
                     <span className="w-16 text-right font-semibold">
-                      {mode === "money" ? formatMoney(f.lostCents, currency) : formatPercent(f.wasteRate!)}
+                      {display(f)}
                     </span>
                   </div>
                 </motion.li>

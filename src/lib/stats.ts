@@ -2,7 +2,11 @@ import "server-only";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 
-/** Which shop, and whether its delivery log is on (it changes how waste is priced). */
+/**
+ * Which shop, and whether its delivery log is on. Purchase prices only exist
+ * in deliveries, so with deliveries off there is no money at all: callers
+ * show stems only (`deliveries` doubles as "money figures available").
+ */
 export type Scope = { shopId: string; deliveries: boolean };
 
 export const scopeOf = (shop: { id: string; deliveriesEnabled: boolean }): Scope => ({
@@ -11,31 +15,34 @@ export const scopeOf = (shop: { id: string; deliveriesEnabled: boolean }): Scope
 });
 
 /**
- * Waste entries in a period, each priced per stem.
- *
- * With deliveries on, a stem costs what was paid at that flower's most recent
- * delivery on or before the waste date (else the earliest one after it).
- * Without deliveries, or when a flower has none, its usual price is used.
+ * Waste entries in a period, each priced per stem from deliveries: what was
+ * paid at that flower's most recent delivery on or before the waste date
+ * (else the earliest one after it). A flower with no delivery has no price.
+ * With deliveries off nothing is priced (unit_cost 0) and nothing is flagged.
  * Columns: flower_type_id, quantity, wasted_on, unit_cost (cents), priced (bool).
  */
 function pricedWaste({ shopId, deliveries }: Scope, from: string, to: string): SQL {
-  const deliveryPrice = deliveries
-    ? sql`(
-        select d.unit_cost_cents from deliveries d
-        where d.shop_id = w.shop_id and d.flower_type_id = w.flower_type_id
-        order by (d.received_on <= w.wasted_on) desc,
-                 case when d.received_on <= w.wasted_on then d.received_on end desc nulls last,
-                 d.received_on asc
-        limit 1
-      )`
-    : sql`null::int`;
+  if (!deliveries) {
+    return sql`
+      select w.flower_type_id, w.quantity, w.wasted_on, 0 as unit_cost, true as priced
+      from waste_entries w
+      where w.shop_id = ${shopId} and w.wasted_on between ${from}::date and ${to}::date
+    `;
+  }
   return sql`
     select w.flower_type_id, w.quantity, w.wasted_on,
       coalesce(p.cost, 0) as unit_cost,
       (p.cost is not null) as priced
     from waste_entries w
-    join flower_types f on f.id = w.flower_type_id
-    cross join lateral (select coalesce(${deliveryPrice}, f.unit_cost_cents) as cost) p
+    -- left join: waste of a flower with no delivery stays in, unpriced.
+    left join lateral (
+      select d.unit_cost_cents as cost from deliveries d
+      where d.shop_id = w.shop_id and d.flower_type_id = w.flower_type_id
+      order by (d.received_on <= w.wasted_on) desc,
+               case when d.received_on <= w.wasted_on then d.received_on end desc nulls last,
+               d.received_on asc
+      limit 1
+    ) p on true
     where w.shop_id = ${shopId} and w.wasted_on between ${from}::date and ${to}::date
   `;
 }
@@ -46,8 +53,11 @@ export type PeriodSummary = {
   lostCents: number;
   /** Wasted ÷ delivered within the period; null when nothing was delivered. */
   wasteRate: number | null;
+  /** Most money lost (deliveries on only). */
   worstFlower: { name: string; lostCents: number } | null;
-  /** Flowers binned in the period with no price at all, so money lost undercounts. */
+  /** Most stems binned: the headline when there's no money. */
+  mostBinned: { name: string; stems: number } | null;
+  /** Deliveries on: flowers binned with no delivery to price them, so money lost undercounts. */
   unpricedFlowers: number;
 };
 
@@ -60,6 +70,8 @@ export async function periodSummary(scope: Scope, from: string, to: string): Pro
     lost_cents: string;
     worst_name: string | null;
     worst_cents: string | null;
+    top_name: string | null;
+    top_stems: number | null;
     unpriced: number;
   }>(sql`
     with priced as (${pricedWaste(scope, from, to)}),
@@ -77,6 +89,9 @@ export async function periodSummary(scope: Scope, from: string, to: string): Pro
       (select f.name from per_flower p join flower_types f on f.id = p.flower_type_id
         where p.cents > 0 order by p.cents desc limit 1) as worst_name,
       (select max(cents) from per_flower)::bigint as worst_cents,
+      (select f.name from per_flower p join flower_types f on f.id = p.flower_type_id
+        order by p.stems desc, f.name limit 1) as top_name,
+      (select max(stems) from per_flower)::int as top_stems,
       (select count(*) from per_flower where not all_priced)::int as unpriced
   `);
 
@@ -89,6 +104,7 @@ export async function periodSummary(scope: Scope, from: string, to: string): Pro
     lostCents: Number(r.lost_cents),
     wasteRate: deliveredStems > 0 ? wastedStems / deliveredStems : null,
     worstFlower: r.worst_name ? { name: r.worst_name, lostCents: Number(r.worst_cents) } : null,
+    mostBinned: r.top_name ? { name: r.top_name, stems: Number(r.top_stems) } : null,
     unpricedFlowers: Number(r.unpriced),
   };
 }
@@ -102,7 +118,7 @@ export type FlowerStats = {
   lostCents: number;
   /** null when nothing was delivered in the period. */
   wasteRate: number | null;
-  /** false when some of its waste had no price (no delivery, no usual price). */
+  /** false when some of its waste had no price (no delivery logged for it). */
   priced: boolean;
 };
 
@@ -139,7 +155,7 @@ export async function flowerStats(scope: Scope, from: string, to: string): Promi
     left join d on d.flower_type_id = f.id
     where f.shop_id = ${shopId}
       and (w.stems is not null or (${scope.deliveries} and d.stems is not null))
-    order by lost desc, f.name
+    order by lost desc, wasted desc, f.name
   `);
 
   return rows.map((r) => {

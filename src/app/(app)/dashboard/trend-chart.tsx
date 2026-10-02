@@ -25,7 +25,8 @@ export type TrendRow = {
   wastedStems: number;
 };
 
-type Props = { rows: TrendRow[]; currency: string; unit: "day" | "week" };
+/** `money`: deliveries are on, so the chart plots money lost; otherwise stems. */
+type Props = { rows: TrendRow[]; currency: string; unit: "day" | "week"; money: boolean };
 
 const axisTick = { fill: CHART.axisText, fontSize: 11, fontFamily: "var(--font-plex-mono)" };
 
@@ -33,7 +34,8 @@ function TrendTooltip({
   active,
   payload,
   currency,
-}: TooltipContentProps<number, string> & { currency: string }) {
+  money,
+}: TooltipContentProps<number, string> & { currency: string; money: boolean }) {
   if (!active || !payload?.length) return null;
   const row = payload[0].payload as TrendRow;
   return (
@@ -41,24 +43,28 @@ function TrendTooltip({
       {/* Value leads, label follows. */}
       <div className="flex items-center gap-2">
         <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ background: CHART.money }} />
-        <span className="font-semibold text-soil">{formatMoney(row.lostCents, currency)}</span>
-        <span className="text-soil-soft">lost</span>
+        <span className="font-semibold text-soil">
+          {money ? formatMoney(row.lostCents, currency) : formatNumber(row.wastedStems)}
+        </span>
+        <span className="text-soil-soft">{money ? "lost" : "stems binned"}</span>
       </div>
-      <div className="mt-0.5 text-soil-soft">{formatNumber(row.wastedStems)} stems binned</div>
+      {money && <div className="mt-0.5 text-soil-soft">{formatNumber(row.wastedStems)} stems binned</div>}
       <div className="label-caps mt-1">{row.period}</div>
     </div>
   );
 }
 
-/** Money lost over time: one series, so no legend — the heading names it. */
-export function TrendChart({ rows, currency, unit }: Props) {
+/** Waste over time (money, or stems without deliveries): one series, so no legend. */
+export function TrendChart({ rows, currency, unit, money }: Props) {
   const [asTable, setAsTable] = useState(false);
-  const data = rows.map((r) => ({ ...r, lost: r.lostCents / 100 }));
+  const data = rows.map((r) => ({ ...r, value: money ? r.lostCents / 100 : r.wastedStems }));
 
   return (
     <div>
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="font-serif text-3xl md:text-4xl">Money lost, {unit === "day" ? "day by day" : "week by week"}</h2>
+        <h2 className="font-serif text-3xl md:text-4xl">
+          {money ? "Money lost" : "Stems binned"}, {unit === "day" ? "day by day" : "week by week"}
+        </h2>
         <button
           type="button"
           onClick={() => setAsTable((t) => !t)}
@@ -80,11 +86,11 @@ export function TrendChart({ rows, currency, unit }: Props) {
             className="mt-6 max-h-80 overflow-y-auto border-t border-soil"
           >
             <table className="w-full text-sm">
-              <caption className="sr-only">Money lost and stems binned per {unit}</caption>
+              <caption className="sr-only">{money ? "Money lost and stems" : "Stems"} binned per {unit}</caption>
               <thead>
                 <tr className="label-caps text-left">
                   <th scope="col" className="py-2 font-normal">{unit === "day" ? "Day" : "Week"}</th>
-                  <th scope="col" className="py-2 text-right font-normal">Lost</th>
+                  {money && <th scope="col" className="py-2 text-right font-normal">Lost</th>}
                   <th scope="col" className="py-2 text-right font-normal">Stems</th>
                 </tr>
               </thead>
@@ -92,8 +98,8 @@ export function TrendChart({ rows, currency, unit }: Props) {
                 {rows.map((r) => (
                   <tr key={r.period} className="border-t border-hairline">
                     <td className="py-2">{r.period}</td>
-                    <td className="py-2 text-right">{formatMoney(r.lostCents, currency)}</td>
-                    <td className="py-2 text-right text-soil-soft">{formatNumber(r.wastedStems)}</td>
+                    {money && <td className="py-2 text-right">{formatMoney(r.lostCents, currency)}</td>}
+                    <td className={`py-2 text-right ${money ? "text-soil-soft" : ""}`}>{formatNumber(r.wastedStems)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -109,7 +115,7 @@ export function TrendChart({ rows, currency, unit }: Props) {
             // Height includes the x-axis band, so labels never get clipped.
             className="mt-6 h-64 md:h-80"
             role="img"
-            aria-label={`Money lost per ${unit}. Use "Show as table" for the values.`}
+            aria-label={`${money ? "Money lost" : "Stems binned"} per ${unit}. Use "Show as table" for the values.`}
           >
             <ResponsiveContainer width="100%" height="100%">
               {/* Right margin leaves room for the last date label ("1 Oct"). */}
@@ -129,15 +135,17 @@ export function TrendChart({ rows, currency, unit }: Props) {
                   axisLine={false}
                   width={52}
                   allowDecimals={false}
-                  tickFormatter={(v: number) => formatMoney(v * 100, currency)}
+                  tickFormatter={(v: number) => (money ? formatMoney(v * 100, currency) : formatNumber(v))}
                 />
                 <Tooltip
                   cursor={{ stroke: CHART.ink, strokeWidth: 1 }}
-                  content={(p) => <TrendTooltip {...(p as TooltipContentProps<number, string>)} currency={currency} />}
+                  content={(p) => (
+                    <TrendTooltip {...(p as TooltipContentProps<number, string>)} currency={currency} money={money} />
+                  )}
                 />
                 <Area
                   type="monotone"
-                  dataKey="lost"
+                  dataKey="value"
                   stroke={CHART.money}
                   strokeWidth={2}
                   strokeLinejoin="round"

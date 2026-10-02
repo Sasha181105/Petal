@@ -1,7 +1,9 @@
 "use client";
 
 import { AnimatePresence, motion, useAnimate } from "motion/react";
+import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
+import { PasswordInput } from "@/components/password-input";
 import { gentle, quick } from "@/lib/motion";
 import { signIn, type LoginState } from "./actions";
 
@@ -32,16 +34,15 @@ export function LoginForm() {
           className="field mt-2 block h-14 w-full text-lg"
         />
       </label>
-      <label className="block">
-        <span className="label-caps">Password</span>
-        <input
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className="field mt-2 block h-14 w-full text-lg"
-        />
-      </label>
+      <div>
+        <PasswordInput name="password" label="Password" autoComplete="current-password" />
+        <Link
+          href="/forgot-password"
+          className="mt-2 inline-block min-h-11 content-center text-sm text-soil-soft underline-offset-4 hover:text-soil hover:underline"
+        >
+          Forgot password?
+        </Link>
+      </div>
       <AnimatePresence initial={false}>
         {state.error && (
           <motion.p

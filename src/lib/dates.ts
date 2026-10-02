@@ -31,6 +31,20 @@ export function addDays(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Monday of the week containing `date` (weeks run Monday–Sunday). */
+export function weekStartOf(date: string): string {
+  const day = new Date(`${date}T00:00:00Z`).getUTCDay(); // 0 = Sunday
+  return addDays(date, -((day + 6) % 7));
+}
+
+/** ISO week number (1–53) of the week starting on `monday`. */
+export function isoWeekNumber(monday: string): number {
+  // The ISO week belongs to the year of its Thursday.
+  const thursday = new Date(`${addDays(monday, 3)}T00:00:00Z`);
+  const jan1 = Date.UTC(thursday.getUTCFullYear(), 0, 1);
+  return Math.floor((thursday.getTime() - jan1) / 86_400_000 / 7) + 1;
+}
+
 /** "Today", "Yesterday" or e.g. "Mon 28 Sep". */
 export function formatDay(date: string, today: string): string {
   if (date === today) return "Today";

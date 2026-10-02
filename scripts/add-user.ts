@@ -29,8 +29,8 @@ async function main() {
     const userId = await upsertAuthUser(email, password);
     await db
       .insert(shopMembers)
-      .values({ userId, shopId: shop.id })
-      .onConflictDoUpdate({ target: shopMembers.userId, set: { shopId: shop.id } });
+      .values({ userId, shopId: shop.id, role: "manager" })
+      .onConflictDoUpdate({ target: shopMembers.userId, set: { shopId: shop.id, role: "manager" } });
 
     console.log(`✔ ${email} can now sign in to "${shop.name}".`);
   } finally {

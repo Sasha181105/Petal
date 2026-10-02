@@ -13,7 +13,13 @@ import { periodSummary, scopeOf, type PeriodSummary } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 import { signInDemo } from "./login/actions";
 
-type Shop = { id: string; name: string; currency: string; deliveriesEnabled: boolean };
+type Shop = {
+  id: string;
+  name: string;
+  currency: string;
+  deliveriesEnabled: boolean;
+  role: "manager" | "staff";
+};
 
 const SECTIONS = [
   {
@@ -40,6 +46,7 @@ async function currentShop(userId: string): Promise<Shop | null> {
       name: shops.name,
       currency: shops.currency,
       deliveriesEnabled: shops.deliveriesEnabled,
+      role: shopMembers.role,
     })
     .from(shopMembers)
     .innerJoin(shops, eq(shops.id, shopMembers.shopId))
@@ -58,12 +65,15 @@ export default async function Home() {
   const ownShop = user ? await currentShop(user.id) : null;
   const shop = ownShop ?? (await findDemoShop());
   const isSample = !ownShop;
+  const isManager = ownShop?.role === "manager";
+  // Money figures are for managers (or the public sample shop), not staff.
+  const showFigures = Boolean(shop) && (isSample || isManager);
 
   const today = todayIn();
   const from = addDays(today, -6);
   let week: PeriodSummary | null = null;
   let previous: PeriodSummary | null = null;
-  if (shop) {
+  if (shop && showFigures) {
     [week, previous] = await Promise.all([
       periodSummary(scopeOf(shop), from, today),
       periodSummary(scopeOf(shop), addDays(from, -7), addDays(from, -1)),
@@ -139,12 +149,13 @@ export default async function Home() {
                   <span className="transition-transform group-hover:translate-x-1">→</span>
                 </Link>
               )}
-              {(user || demo) && (
+              {(!user || isManager) && (
                 <Link
-                  href={user ? "/dashboard" : "/login"}
+                  // Managers: their numbers. Guests: start a shop of their own.
+                  href={user ? "/dashboard" : "/signup"}
                   className="text-base font-medium text-soil underline decoration-hairline decoration-2 underline-offset-8 transition-colors hover:decoration-rose-deep"
                 >
-                  {user ? "See this week in detail" : "Sign in to your shop"}
+                  {user ? "See this week in detail" : "New here? Start your shop"}
                 </Link>
               )}
             </div>
@@ -167,44 +178,62 @@ export default async function Home() {
               </p>
             </div>
 
-            <dl
-              className={`mt-10 grid grid-cols-2 gap-y-10 ${
-                shop.deliveriesEnabled ? "md:grid-cols-4" : "md:grid-cols-3"
-              }`}
-            >
-              <Figure
-                label="Money lost"
-                value={formatMoney(week.lostCents, shop.currency)}
-                tone="text-clay"
-                delta={change(week.lostCents, previous.lostCents)}
-              />
-              {/* Waste rate needs deliveries (binned ÷ delivered). */}
-              {shop.deliveriesEnabled && (
+            {/* Money and waste rate need purchase prices, which only deliveries provide. */}
+            {shop.deliveriesEnabled ? (
+              <dl className="mt-10 grid grid-cols-2 gap-y-10 md:grid-cols-4">
+                <Figure
+                  label="Money lost"
+                  value={formatMoney(week.lostCents, shop.currency)}
+                  tone="text-clay"
+                  delta={change(week.lostCents, previous.lostCents)}
+                />
                 <Figure
                   label="Waste rate"
                   value={week.wasteRate === null ? "—" : `${Math.round(week.wasteRate * 100)}%`}
                   tone="text-rose-deep"
                   note={`of ${week.deliveredStems.toLocaleString("en-IE")} stems delivered`}
                 />
-              )}
-              <Figure
-                label="Stems binned"
-                value={week.wastedStems.toLocaleString("en-IE")}
-                tone="text-soil"
-                delta={change(week.wastedStems, previous.wastedStems)}
-              />
-              <Figure
-                label="Costliest flower"
-                value={week.worstFlower?.name ?? "—"}
-                tone="text-moss italic"
-                note={
-                  week.worstFlower
-                    ? `${formatMoney(week.worstFlower.lostCents, shop.currency)} lost`
-                    : "Nothing wasted"
-                }
-                small
-              />
-            </dl>
+                <Figure
+                  label="Stems binned"
+                  value={week.wastedStems.toLocaleString("en-IE")}
+                  tone="text-soil"
+                  delta={change(week.wastedStems, previous.wastedStems)}
+                />
+                <Figure
+                  label="Costliest flower"
+                  value={week.worstFlower?.name ?? "—"}
+                  tone="text-moss italic"
+                  note={
+                    week.worstFlower
+                      ? `${formatMoney(week.worstFlower.lostCents, shop.currency)} lost`
+                      : "Nothing wasted"
+                  }
+                  small
+                />
+              </dl>
+            ) : (
+              <dl className="mt-10 grid grid-cols-2 gap-y-10 md:grid-cols-3">
+                <Figure
+                  label="Stems binned"
+                  value={week.wastedStems.toLocaleString("en-IE")}
+                  tone="text-clay"
+                  delta={change(week.wastedStems, previous.wastedStems)}
+                />
+                <Figure
+                  label="Per day"
+                  value={Math.round(week.wastedStems / 7).toLocaleString("en-IE")}
+                  tone="text-soil"
+                  note="stems on average"
+                />
+                <Figure
+                  label="Most binned"
+                  value={week.mostBinned?.name ?? "—"}
+                  tone="text-moss italic"
+                  note={week.mostBinned ? `${week.mostBinned.stems.toLocaleString("en-IE")} stems` : "Nothing wasted"}
+                  small
+                />
+              </dl>
+            )}
           </section>
         )}
 
@@ -212,7 +241,7 @@ export default async function Home() {
         <section className="border-t border-soil pb-24 pt-6">
           <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-soil-soft">In the ledger</h2>
           <ol className="mt-6">
-            {SECTIONS.map((s, i) => (
+            {SECTIONS.filter((s) => s.href !== "/dashboard" || !user || isManager).map((s, i) => (
               <li key={s.href} className="border-b border-hairline">
                 <Link
                   href={s.href}

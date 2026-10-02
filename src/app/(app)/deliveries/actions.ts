@@ -50,13 +50,6 @@ export async function logDelivery(input: DeliveryInput): Promise<Result<{ id: st
     .values({ ...d, shopId: shop.id, createdBy: userId })
     .returning({ id: deliveries.id });
 
-  // The latest price becomes the flower's usual price, so waste stays priced
-  // sensibly even if deliveries are switched off later.
-  await db
-    .update(flowerTypes)
-    .set({ unitCostCents: d.unitCostCents })
-    .where(eq(flowerTypes.id, flower.id));
-
   revalidatePath("/deliveries");
   return { ok: true, id: row.id };
 }

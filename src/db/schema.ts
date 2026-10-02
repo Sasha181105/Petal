@@ -8,6 +8,7 @@ import {
   integer,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -33,10 +34,14 @@ export const shops = pgTable("shops", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   currency: char("currency", { length: 3 }).notNull().default("EUR"),
-  // Optional feature: delivery log + waste rate. Off for new shops.
+  // Optional feature: delivery log. Purchase prices only exist with it, so
+  // money figures and waste rate only appear when it's on. Off for new shops.
   deliveriesEnabled: boolean("deliveries_enabled").notNull().default(false),
   createdAt: createdAt(),
 }).enableRLS();
+
+// Managers run the shop's settings, team and weeks; staff log and read.
+export const memberRole = pgEnum("member_role", ["manager", "staff"]);
 
 export const shopMembers = pgTable(
   "shop_members",
@@ -47,9 +52,38 @@ export const shopMembers = pgTable(
     shopId: uuid("shop_id")
       .notNull()
       .references(() => shops.id, { onDelete: "cascade" }),
+    role: memberRole("role").notNull().default("staff"),
     createdAt: createdAt(),
   },
   (t) => [index("shop_members_shop_idx").on(t.shopId)],
+).enableRLS();
+
+/**
+ * Weeks run Monday–Sunday and close by themselves. A row here means a
+ * manager reopened a past week to correct it; deleting the row closes it again.
+ */
+export const reopenedWeeks = pgTable(
+  "reopened_weeks",
+  {
+    shopId: uuid("shop_id")
+      .notNull()
+      .references(() => shops.id, { onDelete: "cascade" }),
+    weekStart: date("week_start").notNull(),
+    reopenedBy: uuid("reopened_by").references(() => authUsers.id, { onDelete: "set null" }),
+    reopenedAt: timestamp("reopened_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.shopId, t.weekStart] })],
+).enableRLS();
+
+/** Failed sign-ins, to slow down password guessing. Old rows are pruned. */
+export const loginAttempts = pgTable(
+  "login_attempts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("login_attempts_email_at_idx").on(t.email, t.at)],
 ).enableRLS();
 
 export const flowerTypes = pgTable(
@@ -65,9 +99,6 @@ export const flowerTypes = pgTable(
     // image when a photo is replaced or removed.
     photoUrl: text("photo_url"),
     photoPublicId: text("photo_public_id"),
-    // Usual price per stem. Prices waste when deliveries are off, or when a
-    // flower has no delivery yet.
-    unitCostCents: integer("unit_cost_cents"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -147,3 +178,4 @@ export const wasteEntries = pgTable(
 ).enableRLS();
 
 export type WasteReason = (typeof wasteReason.enumValues)[number];
+export type MemberRole = (typeof memberRole.enumValues)[number];

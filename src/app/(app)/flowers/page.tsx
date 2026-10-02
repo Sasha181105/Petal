@@ -10,12 +10,7 @@ import { FlowerList } from "./flower-list";
 export default async function FlowersPage() {
   const { shop } = await requireShop();
   const flowers = await db
-    .select({
-      id: flowerTypes.id,
-      name: flowerTypes.name,
-      photoUrl: flowerTypes.photoUrl,
-      unitCostCents: flowerTypes.unitCostCents,
-    })
+    .select({ id: flowerTypes.id, name: flowerTypes.name, photoUrl: flowerTypes.photoUrl })
     .from(flowerTypes)
     .where(and(eq(flowerTypes.shopId, shop.id), eq(flowerTypes.archived, false)))
     .orderBy(asc(flowerTypes.name));
