@@ -17,7 +17,12 @@ export const isDemoEnabled = () =>
 export async function findDemoShop() {
   if (!isDemoEnabled()) return null;
   const [shop] = await db
-    .select({ id: shops.id, name: shops.name, currency: shops.currency })
+    .select({
+      id: shops.id,
+      name: shops.name,
+      currency: shops.currency,
+      deliveriesEnabled: shops.deliveriesEnabled,
+    })
     .from(shops)
     .where(eq(shops.name, DEMO_SHOP_NAME))
     .limit(1);

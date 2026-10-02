@@ -17,8 +17,11 @@ function useActive() {
   return (href: string) => pathname.startsWith(href);
 }
 
+/** Optional features that are off get a quiet "off" mark on their tab. */
+const isOff = (href: string, deliveriesEnabled: boolean) => href === "/deliveries" && !deliveriesEnabled;
+
 /** Phone: tab bar within thumb reach. The leaf marker glides to the current tab. */
-export function BottomNav() {
+export function BottomNav({ deliveriesEnabled }: { deliveriesEnabled: boolean }) {
   const isActive = useActive();
 
   return (
@@ -45,7 +48,7 @@ export function BottomNav() {
                     />
                   )}
                 </span>
-                {tab.label}
+                <span className={isOff(tab.href, deliveriesEnabled) ? "opacity-50" : ""}>{tab.label}</span>
               </Link>
             </li>
           );
@@ -56,7 +59,7 @@ export function BottomNav() {
 }
 
 /** Tablet/desktop: text links in the masthead; the underline glides between them. */
-export function TopNav() {
+export function TopNav({ deliveriesEnabled }: { deliveriesEnabled: boolean }) {
   const isActive = useActive();
 
   return (
@@ -74,6 +77,9 @@ export function TopNav() {
                 }`}
               >
                 {tab.label}
+                {isOff(tab.href, deliveriesEnabled) && (
+                  <span className="ml-1.5 align-super font-mono text-[9px] uppercase tracking-[0.14em] text-soil-soft">off</span>
+                )}
               </Link>
               {active && (
                 <motion.span

@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { todayIn } from "@/lib/dates";
 import { change, formatMoney, formatNumber, formatPercent, formatShortDate } from "@/lib/format";
 import { requireShop } from "@/lib/shop";
-import { flowerStats, periodSummary, wasteTrend } from "@/lib/stats";
+import { flowerStats, periodSummary, scopeOf, wasteTrend } from "@/lib/stats";
 import { DashboardFrame } from "./dashboard-frame";
-import { FlowerTable } from "./flower-table";
+import { AllFlowers } from "./flower-table";
 import { parseRange } from "./range";
 import { TopFive } from "./top-five";
 import { TrendChart, type TrendRow } from "./trend-chart";
@@ -15,14 +16,15 @@ export default async function DashboardPage({
   searchParams: Promise<{ range?: string; from?: string; to?: string }>;
 }) {
   const { shop } = await requireShop();
+  const scope = scopeOf(shop);
   const today = todayIn();
   const range = parseRange(await searchParams, today);
 
   const [now, before, flowers, trend] = await Promise.all([
-    periodSummary(shop.id, range.from, range.to),
-    periodSummary(shop.id, range.previous.from, range.previous.to),
-    flowerStats(shop.id, range.from, range.to),
-    wasteTrend(shop.id, range.from, range.to, range.unit),
+    periodSummary(scope, range.from, range.to),
+    periodSummary(scope, range.previous.from, range.previous.to),
+    flowerStats(scope, range.from, range.to),
+    wasteTrend(scope, range.from, range.to, range.unit),
   ]);
 
   const trendRows: TrendRow[] = trend.map((p) => ({
@@ -41,53 +43,74 @@ export default async function DashboardPage({
   }));
 
   const vs = `vs previous ${range.days} days`;
-  const empty = now.wastedStems === 0 && now.deliveredStems === 0;
+  const deliveries = shop.deliveriesEnabled;
+  const empty = now.wastedStems === 0;
 
   return (
     <>
       <PageTitle title="Waste" accent="report." />
       <DashboardFrame range={range} today={today}>
-        <p className="label-caps mb-8">
-          {formatShortDate(range.from)} – {formatShortDate(range.to)} · {range.days} days
-        </p>
+        {/* The headline: one big number, one or two quiet ones beside it. */}
+        <section className="grid gap-10 border-t border-soil pt-6 md:grid-cols-12">
+          <div className="md:col-span-6">
+            <p className="label-caps">
+              Money lost · {formatShortDate(range.from)} – {formatShortDate(range.to)}
+            </p>
+            <p className="mt-3 font-serif text-7xl leading-none text-clay md:text-9xl">
+              {formatMoney(now.lostCents, shop.currency)}
+            </p>
+            <Delta value={change(now.lostCents, before.lostCents)} vs={vs} />
+          </div>
 
-        {/* Headline figures */}
-        <dl className="grid grid-cols-2 gap-y-10 border-t border-soil pt-6 md:grid-cols-4">
-          <Figure
-            label="Money lost"
-            value={formatMoney(now.lostCents, shop.currency)}
-            tone="text-clay"
-            size="hero"
-            delta={change(now.lostCents, before.lostCents)}
-            vs={vs}
-          />
-          <Figure
-            label="Waste rate"
-            value={now.wasteRate === null ? "—" : formatPercent(now.wasteRate)}
-            tone="text-rose-deep"
-            points={
-              now.wasteRate !== null && before.wasteRate !== null
-                ? Math.round((now.wasteRate - before.wasteRate) * 100)
-                : null
-            }
-            vs={vs}
-          />
-          <Figure
-            label="Stems binned"
-            value={formatNumber(now.wastedStems)}
-            delta={change(now.wastedStems, before.wastedStems)}
-            vs={vs}
-          />
-          <Figure
-            label="Stems delivered"
-            value={formatNumber(now.deliveredStems)}
-            note={`${formatNumber(before.deliveredStems)} the ${range.days} days before`}
-          />
-        </dl>
+          <dl className="grid grid-cols-2 content-end gap-6 md:col-span-6">
+            <Small
+              label="Stems binned"
+              value={formatNumber(now.wastedStems)}
+              delta={<Delta value={change(now.wastedStems, before.wastedStems)} vs="" compact />}
+            />
+            {deliveries ? (
+              <Small
+                label="Waste rate"
+                value={now.wasteRate === null ? "—" : formatPercent(now.wasteRate)}
+                tone="text-rose-deep"
+                delta={
+                  <span className="text-sm text-soil-soft">
+                    of {formatNumber(now.deliveredStems)} delivered
+                  </span>
+                }
+              />
+            ) : (
+              <Small
+                label="Costliest flower"
+                value={now.worstFlower?.name ?? "—"}
+                tone="text-moss italic"
+                delta={
+                  now.worstFlower && (
+                    <span className="text-sm text-soil-soft">
+                      {formatMoney(now.worstFlower.lostCents, shop.currency)} lost
+                    </span>
+                  )
+                }
+              />
+            )}
+          </dl>
+        </section>
+
+        {/* Honest about gaps in the money figure. */}
+        {now.unpricedFlowers > 0 && (
+          <p className="mt-8 max-w-3xl border-l-2 border-clay bg-clay-wash px-4 py-3 text-sm">
+            {now.unpricedFlowers === 1 ? "1 flower" : `${now.unpricedFlowers} flowers`} binned in this
+            period {now.unpricedFlowers === 1 ? "has" : "have"} no price, so money lost is lower than it
+            really is.{" "}
+            <Link href="/flowers" className="font-medium underline decoration-2 underline-offset-4">
+              Set prices
+            </Link>
+          </p>
+        )}
 
         {empty ? (
           <p className="mt-16 border-t border-hairline py-10 text-lg text-soil-soft">
-            Nothing was delivered or binned in this period. Try a longer one.
+            Nothing was binned in this period. Try a longer one.
           </p>
         ) : (
           <>
@@ -95,74 +118,63 @@ export default async function DashboardPage({
               <TrendChart rows={trendRows} currency={shop.currency} unit={range.unit} />
             </section>
 
-            <div className="mt-20 grid gap-20 lg:grid-cols-12 lg:gap-12">
-              <section className="lg:col-span-5">
-                <TopFive flowers={flowers} currency={shop.currency} />
-              </section>
-              <section className="lg:col-span-7">
-                <FlowerTable flowers={flowers} currency={shop.currency} />
-              </section>
-            </div>
+            <section className="mt-20 max-w-3xl">
+              <TopFive flowers={flowers} currency={shop.currency} rates={deliveries} />
+            </section>
+
+            <section className="mt-20">
+              <AllFlowers flowers={flowers} currency={shop.currency} deliveries={deliveries} />
+            </section>
           </>
+        )}
+
+        {!deliveries && (
+          <p className="mt-16 border-t border-hairline pt-6 text-sm text-soil-soft">
+            Want to know what share of each delivery gets thrown away?{" "}
+            <Link href="/deliveries" className="text-soil underline decoration-hairline decoration-2 underline-offset-4 hover:decoration-moss">
+              Deliveries are optional — see what they add
+            </Link>
+          </p>
         )}
       </DashboardFrame>
     </>
   );
 }
 
-/**
- * One headline figure. More waste is worse, so "up" reads in clay and "down"
- * in moss, always with an arrow and words, never colour alone.
- */
-function Figure({
+/** Change vs the previous period. More waste is worse: up in clay, down in moss, always with an arrow. */
+function Delta({ value, vs, compact }: { value: number | null; vs: string; compact?: boolean }) {
+  return (
+    <p className={`text-sm text-soil-soft ${compact ? "" : "mt-4"}`}>
+      {value === null ? (
+        "Nothing to compare yet"
+      ) : value === 0 ? (
+        `No change ${vs}`
+      ) : (
+        <span className={value > 0 ? "text-clay" : "text-moss"}>
+          {value > 0 ? "↑" : "↓"} {Math.abs(Math.round(value * 100))}%{" "}
+          <span className="text-soil-soft">{vs || "vs before"}</span>
+        </span>
+      )}
+    </p>
+  );
+}
+
+function Small({
   label,
   value,
   tone = "text-soil",
-  size,
   delta,
-  points,
-  note,
-  vs,
 }: {
   label: string;
   value: string;
   tone?: string;
-  size?: "hero";
-  /** Relative change (0.12 = +12%). */
-  delta?: number | null;
-  /** Change in percentage points (for the rate itself). */
-  points?: number | null;
-  note?: string;
-  vs?: string;
+  delta?: React.ReactNode;
 }) {
-  const shown = delta !== undefined ? delta : points;
-  const text =
-    delta !== undefined && delta !== null
-      ? `${Math.abs(Math.round(delta * 100))}%`
-      : points !== undefined && points !== null
-        ? `${Math.abs(points)} pts`
-        : null;
-
   return (
-    <div className="border-l border-hairline pl-5 first:border-l-0 first:pl-0 [&:nth-child(3)]:border-l-0 [&:nth-child(3)]:pl-0 md:[&:nth-child(3)]:border-l md:[&:nth-child(3)]:pl-5">
+    <div className="border-l border-hairline pl-5">
       <dt className="label-caps">{label}</dt>
-      <dd className={`mt-3 font-serif leading-none ${tone} ${size === "hero" ? "text-6xl md:text-8xl" : "text-5xl md:text-6xl"}`}>
-        {value}
-      </dd>
-      {shown !== undefined && (
-        <dd className="mt-3 text-sm text-soil-soft">
-          {shown === null || text === null ? (
-            "Nothing to compare yet"
-          ) : shown === 0 ? (
-            <>No change <span className="text-soil-soft">{vs}</span></>
-          ) : (
-            <span className={shown > 0 ? "text-clay" : "text-moss"}>
-              {shown > 0 ? "↑" : "↓"} {text} <span className="text-soil-soft">{vs}</span>
-            </span>
-          )}
-        </dd>
-      )}
-      {note && <dd className="mt-3 text-sm text-soil-soft">{note}</dd>}
+      <dd className={`mt-2 truncate font-serif text-4xl leading-none md:text-5xl ${tone}`}>{value}</dd>
+      {delta && <dd className="mt-2">{delta}</dd>}
     </div>
   );
 }

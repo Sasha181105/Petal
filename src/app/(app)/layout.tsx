@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 import { requireShop } from "@/lib/shop";
 import { signOut } from "../login/actions";
 import { BottomNav, TopNav } from "./bottom-nav";
@@ -13,10 +15,16 @@ export default async function AppLayout({
       <header className="flex items-center justify-between gap-6 border-b border-hairline py-4 md:py-5">
         <div className="flex items-baseline gap-10">
           <Logo />
-          <TopNav />
+          <TopNav deliveriesEnabled={shop.deliveriesEnabled} />
         </div>
         <div className="flex items-center gap-4">
           <span className="label-caps hidden sm:inline">{shop.name}</span>
+          <Link
+            href="/settings"
+            className="min-h-11 content-center text-sm text-soil-soft underline-offset-4 hover:text-soil hover:underline"
+          >
+            Settings
+          </Link>
           <form action={signOut}>
             <button
               type="submit"
@@ -27,9 +35,10 @@ export default async function AppLayout({
           </form>
         </div>
       </header>
-      {/* Phone: bottom padding keeps content clear of the fixed nav. */}
-      <main className="flex-1 pb-32 pt-8 md:pb-20 md:pt-14">{children}</main>
-      <BottomNav />
+      <main className="flex-1 pb-16 pt-8 md:pb-20 md:pt-14">{children}</main>
+      {/* Phone: bottom margin keeps the footer clear of the fixed nav. */}
+      <SiteFooter className="mb-20 md:mb-0" />
+      <BottomNav deliveriesEnabled={shop.deliveriesEnabled} />
     </div>
   );
 }

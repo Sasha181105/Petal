@@ -15,6 +15,13 @@
       "when": 1790794790532,
       "tag": "0001_flower_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790961720585,
+      "tag": "0002_optional_deliveries",
+      "breakpoints": true
     }
   ]
 }

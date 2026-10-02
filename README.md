@@ -85,8 +85,24 @@ Every table has a `shop_id`, and every query filters by the signed-in user's sho
 no policies, so the tables can't be reached through Supabase's public REST API.
 The app connects to Postgres directly from the server only.
 
-**Money lost** = stems wasted × the unit cost from that flower's most recent
-delivery on or before the waste date.
+## Optional deliveries
+
+Waste logging works on its own. The delivery log is an optional feature, turned
+on per shop in **Settings** (off for new shops). While it's off, the Deliveries
+tab explains what it adds and offers **Get started**.
+
+**Money lost** = stems wasted × a price per stem:
+- **Deliveries on:** the price from that flower's most recent delivery on or before
+  the waste date (else the earliest one after it). If the flower has no delivery,
+  its usual price is used.
+- **Deliveries off:** the flower's **usual price per stem**, set on its flower card.
+  Logging a delivery also updates this price.
+
+Flowers with no price at all are flagged on the dashboard, because money lost
+undercounts them.
+
+**Waste rate** (stems binned ÷ stems delivered in the period) needs deliveries, so
+the dashboard only shows it when they're on.
 
 ## Deploying to Vercel
 

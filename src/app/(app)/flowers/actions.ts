@@ -115,6 +115,21 @@ export async function removeFlowerPhoto(flowerId: string): Promise<Result> {
   return { ok: true };
 }
 
+/** Usual price per stem, in cents; null clears it. */
+export async function setFlowerPrice(flowerId: string, cents: number | null): Promise<Result> {
+  const { shop } = await requireShop();
+  const flower = await ownFlower(shop.id, flowerId);
+  if (!flower) return { ok: false, error: "Flower not found." };
+  if (cents !== null && !z.number().int().min(0).max(1_000_000).safeParse(cents).success) {
+    return { ok: false, error: "Enter a price like 0.85" };
+  }
+
+  await db.update(flowerTypes).set({ unitCostCents: cents }).where(eq(flowerTypes.id, flower.id));
+  revalidateFlower(flower.id);
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function renameFlower(flowerId: string, rawName: string): Promise<Result> {
   const { shop } = await requireShop();
   const flower = await ownFlower(shop.id, flowerId);

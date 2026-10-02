@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ShopContext = {
   userId: string;
-  shop: { id: string; name: string; currency: string };
+  shop: { id: string; name: string; currency: string; deliveriesEnabled: boolean };
 };
 
 /**
@@ -23,7 +23,12 @@ export const requireShop = cache(async (): Promise<ShopContext> => {
   if (!user) redirect("/login");
 
   const [row] = await db
-    .select({ id: shops.id, name: shops.name, currency: shops.currency })
+    .select({
+      id: shops.id,
+      name: shops.name,
+      currency: shops.currency,
+      deliveriesEnabled: shops.deliveriesEnabled,
+    })
     .from(shopMembers)
     .innerJoin(shops, eq(shops.id, shopMembers.shopId))
     .where(eq(shopMembers.userId, user.id))

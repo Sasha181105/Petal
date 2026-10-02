@@ -2,17 +2,18 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { Botanical } from "@/components/botanical";
 import { Logo } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 import { TodayLabel } from "@/components/today-label";
 import { db } from "@/db";
 import { shopMembers, shops } from "@/db/schema";
 import { addDays, todayIn } from "@/lib/dates";
 import { change, formatMoney, formatShortDate } from "@/lib/format";
 import { findDemoShop, isDemoEnabled } from "@/lib/demo";
-import { periodSummary, type PeriodSummary } from "@/lib/stats";
+import { periodSummary, scopeOf, type PeriodSummary } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
 import { signInDemo } from "./login/actions";
 
-type Shop = { id: string; name: string; currency: string };
+type Shop = { id: string; name: string; currency: string; deliveriesEnabled: boolean };
 
 const SECTIONS = [
   {
@@ -23,26 +24,29 @@ const SECTIONS = [
   {
     href: "/deliveries",
     title: "Deliveries",
-    text: "What came in, from whom, at what price per stem.",
+    text: "Optional. What came in, from whom, at what price per stem.",
   },
   {
     href: "/dashboard",
     title: "Dashboard",
-    text: "Waste rate per flower, money lost, the five worst, the trend.",
+    text: "Money lost, the five worst flowers, the trend over time.",
   },
 ];
 
 async function currentShop(userId: string): Promise<Shop | null> {
   const [row] = await db
-    .select({ id: shops.id, name: shops.name, currency: shops.currency })
+    .select({
+      id: shops.id,
+      name: shops.name,
+      currency: shops.currency,
+      deliveriesEnabled: shops.deliveriesEnabled,
+    })
     .from(shopMembers)
     .innerJoin(shops, eq(shops.id, shopMembers.shopId))
     .where(eq(shopMembers.userId, userId))
     .limit(1);
   return row ?? null;
 }
-
-
 
 export default async function Home() {
   const supabase = await createClient();
@@ -61,8 +65,8 @@ export default async function Home() {
   let previous: PeriodSummary | null = null;
   if (shop) {
     [week, previous] = await Promise.all([
-      periodSummary(shop.id, from, today),
-      periodSummary(shop.id, addDays(from, -7), addDays(from, -1)),
+      periodSummary(scopeOf(shop), from, today),
+      periodSummary(scopeOf(shop), addDays(from, -7), addDays(from, -1)),
     ]);
   }
 
@@ -163,19 +167,26 @@ export default async function Home() {
               </p>
             </div>
 
-            <dl className="mt-10 grid grid-cols-2 gap-y-10 md:grid-cols-4">
+            <dl
+              className={`mt-10 grid grid-cols-2 gap-y-10 ${
+                shop.deliveriesEnabled ? "md:grid-cols-4" : "md:grid-cols-3"
+              }`}
+            >
               <Figure
                 label="Money lost"
                 value={formatMoney(week.lostCents, shop.currency)}
                 tone="text-clay"
                 delta={change(week.lostCents, previous.lostCents)}
               />
-              <Figure
-                label="Waste rate"
-                value={week.wasteRate === null ? "—" : `${Math.round(week.wasteRate * 100)}%`}
-                tone="text-rose-deep"
-                note={`of ${week.deliveredStems.toLocaleString("en-IE")} stems delivered`}
-              />
+              {/* Waste rate needs deliveries (binned ÷ delivered). */}
+              {shop.deliveriesEnabled && (
+                <Figure
+                  label="Waste rate"
+                  value={week.wasteRate === null ? "—" : `${Math.round(week.wasteRate * 100)}%`}
+                  tone="text-rose-deep"
+                  note={`of ${week.deliveredStems.toLocaleString("en-IE")} stems delivered`}
+                />
+              )}
               <Figure
                 label="Stems binned"
                 value={week.wastedStems.toLocaleString("en-IE")}
@@ -221,10 +232,7 @@ export default async function Home() {
 
         </main>
 
-        <footer className="flex flex-wrap justify-between gap-2 border-t border-hairline py-6 font-mono text-[11px] uppercase tracking-[0.18em] text-soil-soft">
-          <span>Petal · a waste ledger for florists</span>
-          <span>Prices per stem, as delivered</span>
-        </footer>
+        <SiteFooter />
       </div>
     </div>
   );

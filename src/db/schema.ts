@@ -33,6 +33,8 @@ export const shops = pgTable("shops", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   currency: char("currency", { length: 3 }).notNull().default("EUR"),
+  // Optional feature: delivery log + waste rate. Off for new shops.
+  deliveriesEnabled: boolean("deliveries_enabled").notNull().default(false),
   createdAt: createdAt(),
 }).enableRLS();
 
@@ -63,6 +65,9 @@ export const flowerTypes = pgTable(
     // image when a photo is replaced or removed.
     photoUrl: text("photo_url"),
     photoPublicId: text("photo_public_id"),
+    // Usual price per stem. Prices waste when deliveries are off, or when a
+    // flower has no delivery yet.
+    unitCostCents: integer("unit_cost_cents"),
     createdAt: createdAt(),
   },
   (t) => [

@@ -1,5 +1,6 @@
 import { Botanical } from "@/components/botanical";
 import { Logo } from "@/components/logo";
+import { SiteFooter } from "@/components/site-footer";
 import { isDemoEnabled } from "@/lib/demo";
 import { signInDemo } from "./actions";
 import { LoginForm } from "./login-form";
@@ -60,6 +61,7 @@ export default async function LoginPage({
           )}
         </div>
       </main>
+      <SiteFooter />
     </div>
   );
 }

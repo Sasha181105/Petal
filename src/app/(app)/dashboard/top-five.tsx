@@ -17,7 +17,16 @@ const MODES: { key: Mode; label: string }[] = [
   { key: "rate", label: "By waste rate" },
 ];
 
-export function TopFive({ flowers, currency }: { flowers: FlowerStats[]; currency: string }) {
+/** `rates`: deliveries are on, so ranking by waste rate is possible. */
+export function TopFive({
+  flowers,
+  currency,
+  rates,
+}: {
+  flowers: FlowerStats[];
+  currency: string;
+  rates: boolean;
+}) {
   const [mode, setMode] = useState<Mode>("money");
 
   const ranked =
@@ -39,6 +48,7 @@ export function TopFive({ flowers, currency }: { flowers: FlowerStats[]; currenc
         </h2>
 
         {/* Segmented toggle; the dark pill glides to the chosen option. */}
+        {rates && (
         <LayoutGroup id="top-five-mode">
           <div role="group" aria-label="Rank flowers" className="flex rounded-full border border-soil/25 p-1">
             {MODES.map((m) => (
@@ -59,6 +69,7 @@ export function TopFive({ flowers, currency }: { flowers: FlowerStats[]; currenc
             ))}
           </div>
         </LayoutGroup>
+        )}
       </div>
 
       {top.length === 0 ? (
@@ -87,7 +98,9 @@ export function TopFive({ flowers, currency }: { flowers: FlowerStats[]; currenc
                     <ZoomablePhoto url={f.photoUrl} name={f.name} variant="chip" />
                     <span className="min-w-0 flex-1 truncate font-medium">{f.name}</span>
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-soil-soft">
-                      {formatNumber(f.wastedStems)} / {formatNumber(f.deliveredStems)} stems
+                      {rates
+                        ? `${formatNumber(f.wastedStems)} / ${formatNumber(f.deliveredStems)} stems`
+                        : `${formatNumber(f.wastedStems)} stems binned`}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center gap-3 pl-9">

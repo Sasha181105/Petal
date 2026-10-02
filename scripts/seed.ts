@@ -87,7 +87,7 @@ async function main() {
     const userId = await upsertAuthUser(email, password);
 
     await db.delete(shops).where(eq(shops.name, SHOP_NAME));
-    const [shop] = await db.insert(shops).values({ name: SHOP_NAME }).returning();
+    const [shop] = await db.insert(shops).values({ name: SHOP_NAME, deliveriesEnabled: true }).returning();
     await db
       .insert(shopMembers)
       .values({ userId, shopId: shop.id })
@@ -99,7 +99,7 @@ async function main() {
       .returning();
     const flowerRows = await db
       .insert(flowerTypes)
-      .values(FLOWERS.map(([name]) => ({ shopId: shop.id, name })))
+      .values(FLOWERS.map(([name, cost]) => ({ shopId: shop.id, name, unitCostCents: Math.round(cost * 100) })))
       .returning();
 
     const today = new Date().toISOString().slice(0, 10);
