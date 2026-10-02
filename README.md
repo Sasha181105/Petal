@@ -1,190 +1,201 @@
 # Petal
 
-Waste tracking and inventory for a small flower shop. Staff log deliveries and
-discarded stems from a phone at the counter; the dashboard shows waste rate per
-flower type, money lost, the worst performers and the trend over time.
+A waste ledger for small flower shops. Florists note discarded stems from a phone
+at the counter in a few taps; managers see what gets thrown away, per flower and
+per week, and download a PDF report every Monday.
 
-**Stack:** Next.js (App Router) · TypeScript · Tailwind CSS · Supabase (Postgres + Auth) · Drizzle ORM · Recharts · Vercel
+**Stack:** Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Supabase (Postgres + Auth) ·
+Drizzle ORM · Recharts · Motion · Cloudinary · `@react-pdf/renderer` · Vercel
 
-## Setup
+## What it does
+
+- **Waste log**: the core screen. Flower (recent ones one tap away, search, photo
+  preview), stems, reason (wilted / damaged / unsold / other), save, with Undo.
+- **Weeks**: Monday–Sunday weeks open and close by themselves. Waste can only be
+  logged in the open week. A manager can reopen a past week to correct it. Every
+  closed week has a PDF report.
+- **Dashboard** (managers): headline figures vs the previous period, trend chart,
+  the five worst flowers and a table of every flower.
+- **Deliveries** (optional, per shop): flower, stems, price per stem, supplier.
+  With deliveries on, reports also show **money lost** and **waste rate**. Without
+  them Petal counts stems only, because it has no purchase prices.
+- **Flowers**: list, card with photo (Cloudinary), rename.
+- **Accounts**: managers sign up and get their own shop; staff are added by the
+  manager. Includes password reset, password change and sign-in throttling.
+
+## Run it locally
 
 Requires Node.js 20+.
 
-1. **Create a Supabase project** at [supabase.com](https://supabase.com).
-   Under *Authentication → Sign In / Providers*, keep Email enabled and leave
-   **"Allow new users to sign up" on**: shop managers register at `/signup`.
-
-2. **Configure environment**
+1. **Create a Supabase project** at [supabase.com](https://supabase.com). Under
+   *Authentication → Sign In / Providers*, keep Email enabled and leave
+   **Allow new users to sign up** on (managers register at `/signup`).
+2. **Configure:**
 
    ```bash
-   cp .env.example .env.local
+   cp .env.example .env.local   # then fill in the values; each is explained there
    ```
 
-   Fill in the values. Each one is described in `.env.example`.
-
-3. **Install, migrate, seed**
+3. **Install and create the tables:**
 
    ```bash
    npm install
-   npm run db:migrate   # creates the tables
-   npm run db:seed      # demo shop + demo login + ~90 days of data
+   npm run db:migrate
    ```
 
-4. **Run**
+4. **Start:**
 
    ```bash
    npm run dev
    ```
 
-   Open http://localhost:3000 and sign in with `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`.
+   Open http://localhost:3000 and create a shop at **Start your shop**. For a shop
+   with 90 days of sample data to click around in, run `npm run db:seed`, then sign
+   in with `DEMO_USER_EMAIL` / `DEMO_USER_PASSWORD`. The seed is for local
+   development only.
 
-## Flower photos (Cloudinary)
+## Deploy to Vercel
 
-Photos are stored on [Cloudinary](https://cloudinary.com), not in the repo or database.
-The database keeps only each flower's `photo_url` and `photo_public_id`.
+1. **Rotate the Supabase secret key** if it was ever shared (Supabase → Project
+   Settings → API Keys → new secret key; delete the old one).
+2. **Import the GitHub repo** in Vercel. It's a standard Next.js project, so no
+   build settings are needed.
+3. **Environment variables.** Set everything in the **App** block of
+   `.env.example`:
 
-1. Create a free Cloudinary account.
-2. Under **Settings → API Keys**, copy the cloud name, API key and API secret into
-   `.env.local` (see `.env.example`).
-3. Restart `npm run dev`.
+   | Variable | Value |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | publishable / anon key |
+   | `SUPABASE_SERVICE_ROLE_KEY` | secret key (server only) |
+   | `DATABASE_URL` | Transaction pooler string, port **6543** |
+   | `NEXT_PUBLIC_SITE_URL` | the site's address, e.g. `https://petal.example.com` |
+   | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary keys |
 
-How it works:
-- **Upload.** The browser shrinks the photo to at most 2000 px, then uploads it
-  straight to Cloudinary using a short-lived signature from the server. The API
-  secret never reaches the browser.
-- **Checks.** The server only saves an upload that sits in that shop's folder
-  (`petal/<shopId>/`). Replacing or removing a photo deletes the old image.
-- **Display.** Cloudinary serves each size on demand (32–56 px thumbnails, up to
-  1200 px on the flower card) in WebP/AVIF. Images lazy-load, and a ~1 KB blurred
-  copy shows until they arrive.
-- **Without photos.** Flowers without a photo get a tinted placeholder. If the
-  Cloudinary keys aren't set, uploads are hidden and everything else works.
+   `DIRECT_URL` and the `DEMO_*` values are for your computer only.
+4. **Deploy.** Migrations run from your computer (`npm run db:migrate`) against the
+   same database. They're already applied if you've run the app locally.
+5. **Supabase → Authentication → URL Configuration:** set **Site URL** to the Vercel
+   address. Add `https://<your-site>/**` (and `http://localhost:3000/**` for local
+   work) to **Redirect URLs**. Without this, links in emails point to localhost.
+6. **Email templates:** paste the files from `supabase/templates/` into
+   **Authentication → Emails → Templates**. Each file's first comment gives its
+   subject line.
+   - `confirm-signup.html` → Confirm signup
+   - `invite.html` → Invite user
+   - `recovery.html` → Reset password
+7. **Smoke test** on the live site: sign up, add a flower, log waste, invite staff
+   with **Set a password now**, and after a Monday download a weekly PDF.
 
-## Weeks and weekly reports
+### Email (until a custom domain is set up)
 
-Weeks run **Monday to Sunday** (Europe/Dublin) and open and close by themselves.
+Supabase's built-in email is for testing: a few emails an hour, and only to
+addresses in your Supabase team. Real sign-up confirmations, password resets and
+invitations need your own sender. The plan is **Resend**, which requires a
+verified domain. Once there's a domain, add Resend's SMTP details under
+**Authentication → Emails → SMTP Settings**. No code changes are needed.
 
-- **Logging:** waste can only be logged in the **open week**. The server checks this,
-  not just the date picker. Entries in closed weeks can't be deleted.
-- **Corrections:** a **manager** can reopen a past week on the **Weeks** page, then
-  close it again.
-- **Reports:** every closed week has a **PDF report**, from `/weeks/<monday>/report`.
-  It holds the headline figures vs the week before, the five worst flowers, every
-  flower by reason, and every entry with who logged it.
-
-The PDF is rendered on the server with `@react-pdf/renderer`, using the TTF fonts in
-`src/assets/fonts`.
+Until then:
+- **Add staff** with **Set a password now** instead of an emailed invitation.
+- **Optionally switch off "Confirm email"** (Authentication → Sign In / Providers →
+  Email) so managers can sign up without an email. Turn it back on once Resend is
+  live.
 
 ## Accounts, roles and passwords
 
 | | Staff | Manager |
 |---|---|---|
-| Log waste and deliveries, manage flowers | ✓ | ✓ |
+| Log waste and deliveries, manage flowers and photos | ✓ | ✓ |
 | Change own password | ✓ | ✓ |
 | Dashboard, weekly PDF reports, money figures | | ✓ |
 | Turn features on/off, manage the team, reopen weeks | | ✓ |
 
-- **Managers sign up themselves** at `/signup` (shop name, currency, email,
-  password). The account becomes the manager of a new shop, created on first
-  sign-in. If Supabase asks people to confirm their email, the shop is created
-  after they follow the link. A short **Welcome** page lists the first steps.
-- **Staff can't sign up.** Managers add them in **Settings → Team**, either by
-  emailing an invitation or by setting a temporary password to hand over in person.
-- **Forgot password:** the link on the sign-in page emails a one-time link.
-- **Sign-in protection:** after 5 wrong passwords in 15 minutes, that email is
-  locked for 15 minutes.
+- **Manager sign-up** (`/signup`): shop name, currency, email, password. The shop is
+  created on first sign-in (after email confirmation, if that's on), and a
+  **Welcome** page lists the first steps.
+- **Staff** can't sign up. Managers add them in **Settings → Team**, by email
+  invitation or with a temporary password.
+- **Forgot password** emails a one-time link. After 5 wrong passwords in 15 minutes
+  an address is locked for 15 minutes.
 
-**Supabase setup for email links** (password reset, invitations):
-1. **Authentication → URL Configuration:** set **Site URL** to your site. Add
-   `http://localhost:3000/**` and `https://<your-site>/**` to **Redirect URLs**.
-2. **Email templates.** In **Authentication → Emails → Templates**, paste the Petal
-   templates from `supabase/templates/`. Each file's first comment gives its subject
-   line:
-   - `confirm-signup.html` → **Confirm signup**
-   - `invite.html` → **Invite user**
-   - `recovery.html` → **Reset password**
-3. **Email delivery.** Supabase's built-in email is for testing only: it sends a
-   few emails an hour and only to your Supabase team's addresses. For real staff,
-   add your own SMTP under **Authentication → Emails → SMTP Settings** (for example
-   Resend or Postmark). Until then, use **Set a password now** when adding staff.
+## Weeks and reports
 
-## Adding users from the command line
+Weeks run **Monday to Sunday** in Europe/Dublin time.
 
-Normally managers sign up at `/signup` and add their own staff. For setting up a
-shop by hand, this creates a manager account:
+- **Logging.** The server only accepts and deletes waste in the open week (or a
+  reopened one).
+- **Reports.** A closed week's PDF (`/weeks/<monday>/report`) holds:
+  - the headline figures vs the week before;
+  - the five worst flowers;
+  - every flower by reason;
+  - every entry with who logged it.
+- **Printing.** PDFs and printed pages use a white background.
 
-```bash
-npm run user:add -- anna@example.com "a-strong-password" "Anna's Flowers"
-```
+## Optional deliveries
 
-This creates the shop if it doesn't exist and links the user to it. Without the
-shop name, the user joins the only existing shop.
+Purchase prices only exist in deliveries, so the per-shop setting decides whether
+Petal shows money:
+
+- **Off: stems only.** Totals, per day, most binned flower, by reason.
+- **On: money and waste rate too.**
+  - **Money lost** = stems binned × the price paid at that flower's most recent
+    delivery on or before the waste date (else the earliest one after it).
+  - A flower binned but never delivered has no price. Reports flag it.
+  - **Waste rate** = stems binned ÷ stems delivered in the period.
+
+Switching off hides the log and all money figures; nothing is deleted.
+
+## Flower photos
+
+Photos live on Cloudinary; the database keeps only each flower's URL.
+
+- **Upload.** The browser shrinks a photo to 2000 px and uploads it straight to
+  Cloudinary with a short-lived server signature. The server only saves uploads
+  from the shop's own folder (`petal/<shopId>/`).
+- **Display.** Images are served at the size needed, lazy-loaded, with a blurred
+  stand-in. Flowers without a photo get a tinted placeholder.
 
 ## Database
 
-The schema is in [src/db/schema.ts](src/db/schema.ts). After changing it:
+Schema: [src/db/schema.ts](src/db/schema.ts). After changing it:
 
 ```bash
-npm run db:generate   # writes a new SQL migration to drizzle/
+npm run db:generate   # writes a migration to drizzle/
 npm run db:migrate    # applies it
 ```
 
 Every table has a `shop_id`, and every query filters by the signed-in user's shop
 (`requireShop()` in [src/lib/shop.ts](src/lib/shop.ts)). Row Level Security is on with
 no policies, so the tables can't be reached through Supabase's public REST API.
-The app connects to Postgres directly from the server only.
+The app talks to Postgres from the server only.
 
-## Optional deliveries
+## Command-line helpers
 
-Waste logging works on its own. The delivery log is an optional feature, turned
-on per shop in **Settings** (off for new shops). While it's off, the Deliveries
-tab explains what it adds and offers **Get started**.
-
-Purchase prices only exist in deliveries, so the setting decides whether Petal
-shows money at all:
-
-- **Deliveries off: stems only.** The dashboard, weekly PDFs, home page, Weeks page
-  and flower cards count stems binned (total, per day, most binned flower, by
-  reason). No prices are asked for or shown.
-- **Deliveries on: money and waste rate too.**
-  - **Money lost** = stems binned × the price from that flower's most recent
-    delivery on or before the waste date (else the earliest one after it).
-  - If a flower was binned but never delivered, it has no price. The dashboard and
-    PDF flag it, because money lost undercounts it.
-  - **Waste rate** = stems binned ÷ stems delivered in the period.
-
-Switching deliveries off hides the log and every money figure. Nothing is deleted:
-switch it back on and the figures return.
-
-## Deploying to Vercel
-
-1. Push the repo to GitHub and import it in Vercel.
-2. Add these environment variables: `NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `DATABASE_URL` (transaction pooler, port 6543).
-   The service role key is only needed locally for scripts.
-   - **Real shop:** that's all. Visitors see a **Sign in** button only.
-   - **Public demo:** also set `PUBLIC_DEMO=true`, `DEMO_USER_EMAIL` and
-     `DEMO_USER_PASSWORD`. The home page then shows **Open the demo shop**, which
-     signs visitors into the demo shop, and the demo shop's weekly figures.
-3. Deploy. Run migrations and seed from your machine against the same database.
-
-## Screenshots
-
-_To be added once the screens are built._
+```bash
+npm run db:seed                                       # local sample shop (development only)
+npm run user:add -- anna@example.com "password" "Anna's Flowers"   # manager account by hand
+```
 
 ## Project layout
 
 ```
 src/
   app/
-    login/            sign-in page and auth actions
-    (app)/            signed-in area with bottom nav
+    page.tsx          home
+    login/ signup/ forgot-password/ reset-password/ auth/confirm/
+    (app)/            signed-in area
       waste/          waste log (core screen)
-      deliveries/     delivery log
-      dashboard/      charts and tables
+      deliveries/     optional delivery log
+      flowers/        flower list and cards
+      dashboard/      charts and tables (managers)
+      weeks/          weeks list and PDF route (managers)
+      settings/       account, features, team
+      welcome/        first steps for a new manager
+  components/         shared UI (flower picker, photos, forms, nav pieces)
   db/                 Drizzle schema and client
-  lib/                Supabase client, shop scoping
-  proxy.ts            session refresh and auth redirects (Next.js middleware)
-scripts/              seed and add-user CLI scripts
-drizzle/              generated SQL migrations
+  lib/                stats, weeks, PDF, auth helpers, Cloudinary
+  proxy.ts            session refresh and auth redirects
+supabase/templates/   email templates for Supabase Auth
+scripts/              seed and add-user
+drizzle/              SQL migrations
 ```

@@ -22,8 +22,11 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  // Absolute links for social previews, once the site has its address.
+  metadataBase: process.env.NEXT_PUBLIC_SITE_URL ? new URL(process.env.NEXT_PUBLIC_SITE_URL) : undefined,
   title: "Petal",
-  description: "Flower waste tracking for small shops",
+  description:
+    "A waste ledger for florists: note what goes in the bin at the counter, and see what it costs each week.",
 };
 
 export const viewport: Viewport = {

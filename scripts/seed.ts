@@ -11,8 +11,10 @@ import {
   wasteEntries,
   type WasteReason,
 } from "../src/db/schema";
-import { DEMO_SHOP_NAME as SHOP_NAME } from "../src/lib/demo-shop";
 import { connect, env, upsertAuthUser } from "./lib";
+
+// Local development only: a sample shop to click around in. Not used by the site.
+const SHOP_NAME = "Petal Demo";
 const DAYS = 90;
 const DELIVERY_WEEKDAYS = [2, 5]; // Tuesday, Friday
 

@@ -8,8 +8,15 @@ const globalForDb = globalThis as unknown as { pgClient?: postgres.Sql };
 
 const client =
   globalForDb.pgClient ??
-  // prepare: false is required by Supabase's transaction pooler.
-  postgres(process.env.DATABASE_URL!, { prepare: false });
+  postgres(process.env.DATABASE_URL!, {
+    // Required by Supabase's transaction pooler.
+    prepare: false,
+    // Serverless (Vercel): a few connections per instance, released when idle;
+    // the pooler does the real pooling.
+    max: 5,
+    idle_timeout: 20,
+    connect_timeout: 10,
+  });
 
 if (process.env.NODE_ENV !== "production") globalForDb.pgClient = client;
 

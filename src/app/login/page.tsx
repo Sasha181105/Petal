@@ -2,8 +2,6 @@ import Link from "next/link";
 import { Botanical } from "@/components/botanical";
 import { Logo } from "@/components/logo";
 import { SiteFooter } from "@/components/site-footer";
-import { isDemoEnabled } from "@/lib/demo";
-import { signInDemo } from "./actions";
 import { LoginForm } from "./login-form";
 
 const ERRORS: Record<string, string> = {
@@ -57,18 +55,6 @@ export default async function LoginPage({
               Create a manager account
             </Link>
           </p>
-
-          {isDemoEnabled() && (
-            <form action={signInDemo} className="mt-8 border-t border-hairline pt-6">
-              <p className="text-soil-soft">Just looking around?</p>
-              <button
-                type="submit"
-                className="mt-1 font-medium underline decoration-hairline decoration-2 underline-offset-8 transition-colors hover:decoration-rose-deep"
-              >
-                Open the demo shop →
-              </button>
-            </form>
-          )}
         </div>
       </main>
       <SiteFooter />

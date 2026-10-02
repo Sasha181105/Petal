@@ -8,10 +8,8 @@ import { db } from "@/db";
 import { shopMembers, shops } from "@/db/schema";
 import { addDays, todayIn } from "@/lib/dates";
 import { change, formatMoney, formatShortDate } from "@/lib/format";
-import { findDemoShop, isDemoEnabled } from "@/lib/demo";
 import { periodSummary, scopeOf, type PeriodSummary } from "@/lib/stats";
 import { createClient } from "@/lib/supabase/server";
-import { signInDemo } from "./login/actions";
 
 type Shop = {
   id: string;
@@ -61,26 +59,21 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Signed in: this shop's week. Signed out: the demo shop's week (if enabled).
-  const ownShop = user ? await currentShop(user.id) : null;
-  const shop = ownShop ?? (await findDemoShop());
-  const isSample = !ownShop;
-  const isManager = ownShop?.role === "manager";
-  // Money figures are for managers (or the public sample shop), not staff.
-  const showFigures = Boolean(shop) && (isSample || isManager);
+  // Signed-in managers see their shop's week; staff and guests see no figures.
+  const shop = user ? await currentShop(user.id) : null;
+  const isManager = shop?.role === "manager";
 
   const today = todayIn();
   const from = addDays(today, -6);
   let week: PeriodSummary | null = null;
   let previous: PeriodSummary | null = null;
-  if (shop && showFigures) {
+  if (shop && isManager) {
     [week, previous] = await Promise.all([
       periodSummary(scopeOf(shop), from, today),
       periodSummary(scopeOf(shop), addDays(from, -7), addDays(from, -1)),
     ]);
   }
 
-  const demo = isDemoEnabled();
   const range = `${formatShortDate(from)} – ${formatShortDate(today)}`;
 
   return (
@@ -108,7 +101,7 @@ export default async function Home() {
         <section className="grid gap-10 pb-20 pt-16 md:grid-cols-12 md:pb-28 md:pt-24">
           <div className="md:col-span-8">
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-moss motion-safe:animate-rise">
-              {shop ? shop.name : "For florists"} · {isSample && shop ? "sample shop" : "at the counter"}
+              {shop ? shop.name : "For florists"} · at the counter
             </p>
             <h1 className="mt-6 font-serif text-[clamp(3.4rem,9vw,8.5rem)] leading-[0.92] tracking-[-0.02em] motion-safe:animate-rise [animation-delay:120ms]">
               Every stem
@@ -129,18 +122,7 @@ export default async function Home() {
                   Log waste
                   <span className="transition-transform group-hover:translate-x-1">→</span>
                 </Link>
-              ) : demo ? (
-                <form action={signInDemo}>
-                  <button
-                    type="submit"
-                    className="group inline-flex h-14 items-center gap-3 rounded-full bg-moss px-8 text-base font-medium text-linen transition-colors hover:bg-moss-deep focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-moss"
-                  >
-                    Open the demo shop
-                    <span className="transition-transform group-hover:translate-x-1">→</span>
-                  </button>
-                </form>
               ) : (
-                // Real shop, signed out: signing in is the one thing to do here.
                 <Link
                   href="/login"
                   className="group inline-flex h-14 items-center gap-3 rounded-full bg-moss px-8 text-base font-medium text-linen transition-colors hover:bg-moss-deep focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-moss"
@@ -171,7 +153,7 @@ export default async function Home() {
           <section className="border-t border-soil pb-20 pt-6 md:pb-28">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-serif text-3xl md:text-4xl">
-                The last seven days{isSample && <em className="text-soil-soft"> — sample shop</em>}
+                The last seven days
               </h2>
               <p className="font-mono text-xs uppercase tracking-[0.16em] text-soil-soft">
                 {range} · vs the week before
