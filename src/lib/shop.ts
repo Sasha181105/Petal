@@ -3,7 +3,8 @@ import { eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { db } from "@/db";
-import { shopMembers, shops, type MemberRole } from "@/db/schema";
+import { flowerTypes, shopMembers, shops, type MemberRole } from "@/db/schema";
+import { CATALOGUE } from "@/lib/catalogue";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -52,11 +53,14 @@ async function provisionShop(user: { id: string; user_metadata: Record<string, u
     if (existing) return;
     const [shop] = await tx.insert(shops).values({ name: name.trim(), currency }).returning({ id: shops.id });
     await tx.insert(shopMembers).values({ userId: user.id, shopId: shop.id, role: "manager" });
+    if (user.user_metadata?.new_shop_starter === "catalogue") {
+      await tx.insert(flowerTypes).values(CATALOGUE.map((f) => ({ shopId: shop.id, ...f })));
+    }
   });
 
   // Done with it: clear it so it can never be used again.
   await supabaseAdmin().auth.admin.updateUserById(user.id, {
-    user_metadata: { new_shop_name: null, new_shop_currency: null },
+    user_metadata: { new_shop_name: null, new_shop_currency: null, new_shop_starter: null },
   });
   return membership(user.id);
 }

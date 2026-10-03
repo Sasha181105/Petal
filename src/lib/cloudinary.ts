@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { CATALOGUE_FOLDER } from "./catalogue";
 
 type Config = { cloudName: string; apiKey: string; apiSecret: string };
 
@@ -26,10 +27,13 @@ export function sign(params: Record<string, string | number>, apiSecret: string)
 /** Folder that holds one shop's photos. Uploads outside it are rejected. */
 export const shopFolder = (shopId: string) => `petal/${shopId}`;
 
-/** Best-effort delete; a leftover image costs storage, not correctness. */
+/**
+ * Best-effort delete; a leftover image costs storage, not correctness.
+ * Starter-catalogue photos are shared by many shops and are never deleted.
+ */
 export async function destroyImage(publicId: string): Promise<void> {
   const cfg = cloudinaryConfig();
-  if (!cfg) return;
+  if (!cfg || publicId.startsWith(CATALOGUE_FOLDER)) return;
   const params = { invalidate: "true", public_id: publicId, timestamp: Math.round(Date.now() / 1000) };
   const body = new URLSearchParams({
     ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
