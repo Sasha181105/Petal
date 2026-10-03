@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { flowerTypes } from "@/db/schema";
 import { CATALOGUE } from "@/lib/catalogue";
 import { requireManager } from "@/lib/shop";
+import { createClient } from "@/lib/supabase/server";
 
 export type AddResult = { ok: true; added: number } | { ok: false; error: string };
 
@@ -26,4 +27,19 @@ export async function addFromCatalogue(names: string[]): Promise<AddResult> {
   revalidatePath("/flowers");
   revalidatePath("/waste");
   return { ok: true, added: rows.length };
+}
+
+const STEPS = ["flowers", "team", "waste"] as const;
+export type StepKey = (typeof STEPS)[number];
+
+/** Skip (or un-skip) a Welcome step. Kept on the account, so it sticks. */
+export async function setStepSkipped(step: StepKey, skipped: boolean): Promise<void> {
+  await requireManager();
+  if (!STEPS.includes(step)) return;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const current: string[] = Array.isArray(user?.user_metadata?.welcome_skipped) ? user.user_metadata.welcome_skipped : [];
+  const next = skipped ? [...new Set([...current, step])] : current.filter((s) => s !== step);
+  await supabase.auth.updateUser({ data: { welcome_skipped: next } });
+  revalidatePath("/welcome");
 }

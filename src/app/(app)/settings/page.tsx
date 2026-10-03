@@ -39,8 +39,13 @@ export default async function SettingsPage() {
               {role}
             </span>
           </div>
-          <div className="mt-6">
+          <div className="mt-6 flex flex-wrap gap-3">
             <ReplayTourButton />
+            {isManager && (
+              <Link href="/welcome" className="btn-secondary h-12">
+                Getting started
+              </Link>
+            )}
           </div>
           <h3 className="mt-8 font-serif text-2xl">Change password</h3>
           <div className="mt-4">
