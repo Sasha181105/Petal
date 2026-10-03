@@ -6,6 +6,7 @@ import { LoginForm } from "./login-form";
 
 const ERRORS: Record<string, string> = {
   "no-shop": "This account isn't linked to a shop yet. Ask the shop owner to add you.",
+  deleted: "Your account has been deleted. Thank you for using Petal.",
 };
 
 export default async function LoginPage({

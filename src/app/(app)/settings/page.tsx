@@ -5,6 +5,7 @@ import { db } from "@/db";
 import type { MemberRole } from "@/db/schema";
 import { requireShop } from "@/lib/shop";
 import { ChangePasswordForm } from "./change-password";
+import { DeleteAccount } from "./delete-account";
 import { DeliveriesSwitch } from "./feature-switch";
 import { TeamPanel, type Member } from "./team-panel";
 
@@ -102,6 +103,17 @@ export default async function SettingsPage() {
             <dt className="text-soil-soft">Currency</dt>
             <dd>{shop.currency}</dd>
           </dl>
+        </section>
+
+        <section>
+          <h2 className="label-caps text-rose-deep">Delete account</h2>
+          <div className="mt-4 border-t border-rose-deep/40 pt-4">
+            <DeleteAccount
+              wholeShop={isManager && !members.some((m) => m.role === "manager" && m.userId !== userId)}
+              shopName={shop.name}
+              teamSize={members.filter((m) => m.userId !== userId).length}
+            />
+          </div>
         </section>
       </div>
     </>
