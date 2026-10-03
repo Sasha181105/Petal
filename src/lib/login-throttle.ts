@@ -32,17 +32,21 @@ export async function recordFailure(email: string): Promise<void> {
 // forms can't be used to flood someone's inbox. Same table, "mail:" prefix.
 const MAX_EMAILS = 3;
 
-/** True if another email may go to this address now; records it if so. */
+const mailKey = (email: string) => `mail:${normalise(email)}`;
+
+/** True if another email may go to this address now. */
 export async function allowEmailTo(email: string): Promise<boolean> {
-  const key = `mail:${normalise(email)}`;
   const since = sql`now() - make_interval(mins => ${WINDOW_MINUTES})`;
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(loginAttempts)
-    .where(and(eq(loginAttempts.email, key), gte(loginAttempts.at, since)));
-  if ((row?.count ?? 0) >= MAX_EMAILS) return false;
-  await db.insert(loginAttempts).values({ email: key });
-  return true;
+    .where(and(eq(loginAttempts.email, mailKey(email)), gte(loginAttempts.at, since)));
+  return (row?.count ?? 0) < MAX_EMAILS;
+}
+
+/** Count an email towards the cap. Call only once it has actually been sent. */
+export async function recordEmailTo(email: string): Promise<void> {
+  await db.insert(loginAttempts).values({ email: mailKey(email) });
 }
 
 export async function clearFailures(email: string): Promise<void> {

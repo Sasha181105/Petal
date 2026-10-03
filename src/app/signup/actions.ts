@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { signupLink } from "@/lib/auth-links";
 import { sendEmail } from "@/lib/email/send";
 import { confirmSignupEmail } from "@/lib/email/templates";
-import { allowEmailTo } from "@/lib/login-throttle";
+import { allowEmailTo, recordEmailTo } from "@/lib/login-throttle";
 import { newPassword } from "@/lib/password";
 import { CURRENCIES } from "@/lib/shop";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -61,6 +61,7 @@ export async function signUpManager(_prev: SignupState, formData: FormData): Pro
     await supabaseAdmin().auth.admin.deleteUser(minted.userId);
     return { error: "Couldn't send the confirmation email. Please try again in a minute.", at: Date.now() };
   }
+  await recordEmailTo(email);
   return { sentTo: email, at: Date.now() };
 }
 

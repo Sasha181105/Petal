@@ -5,7 +5,7 @@ import { z } from "zod";
 import { recoveryLink } from "@/lib/auth-links";
 import { sendEmail } from "@/lib/email/send";
 import { resetPasswordEmail } from "@/lib/email/templates";
-import { allowEmailTo, clearFailures, lockedForMinutes, recordFailure } from "@/lib/login-throttle";
+import { allowEmailTo, clearFailures, lockedForMinutes, recordEmailTo, recordFailure } from "@/lib/login-throttle";
 import { newPassword } from "@/lib/password";
 import { requireShop } from "@/lib/shop";
 import { createClient } from "@/lib/supabase/server";
@@ -68,6 +68,7 @@ export async function requestPasswordReset(_prev: FormState, formData: FormData)
   try {
     const { link } = await recoveryLink(email.data);
     await sendEmail(email.data, resetPasswordEmail({ link, email: email.data }));
+    await recordEmailTo(email.data);
   } catch (err) {
     // No such account: stay silent (same reply). Anything else is logged for us.
     if (!/not.*found|no user/i.test(String(err))) console.error("Password reset email failed", err);
