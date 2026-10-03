@@ -1,7 +1,10 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import Link from "next/link";
 import { db } from "@/db";
+import { flowerTypes } from "@/db/schema";
 import { requireManagerPage } from "@/lib/shop";
+import { CataloguePicker } from "./catalogue-picker";
+import { StartChoice } from "./start-choice";
 
 /** First stop after a manager signs up. Each step ticks itself off. */
 export default async function WelcomePage() {
@@ -13,6 +16,11 @@ export default async function WelcomePage() {
       (select count(*) from shop_members where shop_id = ${shop.id})::int as members,
       (select count(*) from waste_entries where shop_id = ${shop.id})::int as entries
   `);
+
+  const fresh = Number(counts.flowers) === 0;
+  const have = fresh
+    ? []
+    : (await db.select({ name: flowerTypes.name }).from(flowerTypes).where(eq(flowerTypes.shopId, shop.id))).map((f) => f.name);
 
   const steps = [
     {
@@ -49,6 +57,8 @@ export default async function WelcomePage() {
         filling itself.
       </p>
 
+      {fresh && <StartChoice />}
+
       <ol className="mt-12 border-t border-soil">
         {steps.map((s, i) => (
           <li key={s.href} className="border-b border-hairline">
@@ -76,6 +86,18 @@ export default async function WelcomePage() {
           </li>
         ))}
       </ol>
+
+      {!fresh && (
+        <details className="group mt-10 border-b border-hairline pb-6">
+          <summary className="cursor-pointer list-none font-serif text-2xl marker:hidden">
+            Add more from Petal&apos;s list{" "}
+            <span className="inline-block text-soil-soft transition-transform group-open:rotate-90">→</span>
+          </summary>
+          <div className="mt-6">
+            <CataloguePicker have={have} />
+          </div>
+        </details>
+      )}
 
       <p className="mt-10 text-sm text-soil-soft">
         Optional, any time: turn on{" "}

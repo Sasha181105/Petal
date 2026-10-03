@@ -17,8 +17,6 @@ const signupForm = z
   .object({
     shopName: z.string().trim().min(1, "Give your shop a name.").max(80, "Keep the shop name under 80 characters."),
     currency: z.enum(CURRENCIES),
-    // Starter flowers: Petal's list with photos, or an empty shop.
-    starter: z.enum(["catalogue", "blank"]),
     email: z.string().trim().toLowerCase().email("Enter a valid email."),
     password: newPassword,
     confirm: z.string(),
@@ -33,7 +31,7 @@ const signupForm = z
 export async function signUpManager(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const parsed = signupForm.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, at: Date.now() };
-  const { shopName, currency, starter, email, password } = parsed.data;
+  const { shopName, currency, email, password } = parsed.data;
 
   if (!(await allowEmailTo(email))) {
     return { error: "We've just sent a few emails to this address. Check your inbox, or try again in 15 minutes.", at: Date.now() };
@@ -49,11 +47,7 @@ export async function signUpManager(_prev: SignupState, formData: FormData): Pro
 
   let minted: { link: string; userId: string };
   try {
-    minted = await signupLink(email, password, {
-      new_shop_name: shopName,
-      new_shop_currency: currency,
-      new_shop_starter: starter,
-    });
+    minted = await signupLink(email, password, { new_shop_name: shopName, new_shop_currency: currency });
   } catch (err) {
     console.error("Sign-up failed", err);
     return { error: "Couldn't create the account. Please try again.", at: Date.now() };
