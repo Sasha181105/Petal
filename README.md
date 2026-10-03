@@ -71,35 +71,32 @@ Requires Node.js 20+.
    | `DATABASE_URL` | Transaction pooler string, port **6543** |
    | `NEXT_PUBLIC_SITE_URL` | the site's address, e.g. `https://petal.example.com` |
    | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary keys |
+   | `RESEND_API_KEY` | Resend key with sending access |
+   | `EMAIL_FROM` | optional, e.g. `Petal <noreply@your-domain>` |
 
    `DIRECT_URL` and the `DEMO_*` values are for your computer only.
 4. **Deploy.** Migrations run from your computer (`npm run db:migrate`) against the
    same database. They're already applied if you've run the app locally.
 5. **Supabase → Authentication → URL Configuration:** set **Site URL** to the Vercel
    address. Add `https://<your-site>/**` (and `http://localhost:3000/**` for local
-   work) to **Redirect URLs**. Without this, links in emails point to localhost.
-6. **Email templates:** paste the files from `supabase/templates/` into
-   **Authentication → Emails → Templates**. Each file's first comment gives its
-   subject line.
-   - `confirm-signup.html` → Confirm signup
-   - `invite.html` → Invite user
-   - `recovery.html` → Reset password
-7. **Smoke test** on the live site: sign up, add a flower, log waste, invite staff
-   with **Set a password now**, and after a Monday download a weekly PDF.
+   work) to **Redirect URLs**.
+6. **Smoke test** on the live site: sign up, add a flower, log waste, invite staff,
+   and after a Monday download a weekly PDF.
 
-### Email (until a custom domain is set up)
+### Email
 
-Supabase's built-in email is for testing: a few emails an hour, and only to
-addresses in your Supabase team. Real sign-up confirmations, password resets and
-invitations need your own sender. The plan is **Resend**, which requires a
-verified domain. Once there's a domain, add Resend's SMTP details under
-**Authentication → Emails → SMTP Settings**. No code changes are needed.
+Petal sends every email itself through **Resend**, from your own domain:
+sign-up confirmation, password reset and staff invitations. Supabase only mints
+the one-time token (admin `generateLink`, which sends nothing); the link goes
+straight to `/auth/confirm`, so it works in any browser or device. Templates live
+in `src/lib/email/templates.ts`.
 
-Until then:
-- **Add staff** with **Set a password now** instead of an emailed invitation.
-- **Optionally switch off "Confirm email"** (Authentication → Sign In / Providers →
-  Email) so managers can sign up without an email. Turn it back on once Resend is
-  live.
+1. In Resend, add and verify your domain (the DNS records it lists).
+2. Create an API key with **Sending access** and set `RESEND_API_KEY` (and
+   optionally `EMAIL_FROM`) locally and on Vercel.
+
+Supabase's own email templates and SMTP settings aren't used. Each address gets
+at most 3 emails per 15 minutes.
 
 ## Accounts, roles and passwords
 
@@ -195,7 +192,6 @@ src/
   db/                 Drizzle schema and client
   lib/                stats, weeks, PDF, auth helpers, Cloudinary
   proxy.ts            session refresh and auth redirects
-supabase/templates/   email templates for Supabase Auth
 scripts/              seed and add-user
 drizzle/              SQL migrations
 ```

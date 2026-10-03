@@ -1,11 +1,12 @@
 "use server";
 
-import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
-import { siteOrigin } from "@/lib/origin";
+import { signupLink } from "@/lib/auth-links";
+import { sendEmail } from "@/lib/email/send";
+import { confirmSignupEmail } from "@/lib/email/templates";
+import { allowEmailTo } from "@/lib/login-throttle";
 import { newPassword } from "@/lib/password";
 import { CURRENCIES } from "@/lib/shop";
-import { createClient } from "@/lib/supabase/server";
 
 export type SignupState = { error?: string; sentTo?: string; at?: number };
 
@@ -20,38 +21,35 @@ const signupForm = z
   .refine((v) => v.password === v.confirm, { message: "The two passwords don't match." });
 
 /**
- * Manager sign-up: creates the account; the shop itself is created on first
- * sign-in from the details stored on the account (see provisionShop), so it
- * also works when Supabase asks people to confirm their email first.
+ * Manager sign-up. Creates an unconfirmed account and emails a confirmation
+ * link from Petal (Resend). The shop itself is created on first sign-in from
+ * the details stored on the account (see provisionShop in lib/shop.ts).
  */
 export async function signUpManager(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const parsed = signupForm.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message, at: Date.now() };
   const { shopName, currency, email, password } = parsed.data;
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { new_shop_name: shopName, new_shop_currency: currency },
-      emailRedirectTo: `${await siteOrigin()}/auth/confirm?next=/welcome`,
-    },
-  });
+  if (!(await allowEmailTo(email))) {
+    return { error: "We've just sent a few emails to this address. Check your inbox, or try again in 15 minutes.", at: Date.now() };
+  }
 
-  if (error) {
-    if (/already registered|already exists/i.test(error.message)) {
+  let link: string;
+  try {
+    ({ link } = await signupLink(email, password, { new_shop_name: shopName, new_shop_currency: currency }));
+  } catch (err) {
+    if (/already (been )?registered|already exists|email_exists/i.test(String(err))) {
       return { error: "There's already an account with this email. Sign in instead.", at: Date.now() };
     }
-    if (/signups? not allowed|disabled/i.test(error.message)) {
-      return { error: "New sign-ups are switched off for now.", at: Date.now() };
-    }
-    if (error.status === 429) return { error: "Too many attempts. Try again in a few minutes.", at: Date.now() };
+    console.error("Sign-up failed", err);
     return { error: "Couldn't create the account. Please try again.", at: Date.now() };
   }
 
-  // Email confirmation off: signed in already, straight to the new shop.
-  if (data.session) redirect("/welcome", RedirectType.replace);
-  // Confirmation on: the shop is created when they follow the email link.
+  try {
+    await sendEmail(email, confirmSignupEmail({ link, email, shopName }));
+  } catch (err) {
+    console.error("Sign-up email failed", err);
+    return { error: "The account was created, but the confirmation email didn't go out. Try again in a minute.", at: Date.now() };
+  }
   return { sentTo: email, at: Date.now() };
 }

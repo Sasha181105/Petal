@@ -2,8 +2,10 @@
 
 import { redirect, RedirectType } from "next/navigation";
 import { z } from "zod";
-import { clearFailures, lockedForMinutes, recordFailure } from "@/lib/login-throttle";
-import { siteOrigin } from "@/lib/origin";
+import { recoveryLink } from "@/lib/auth-links";
+import { sendEmail } from "@/lib/email/send";
+import { resetPasswordEmail } from "@/lib/email/templates";
+import { allowEmailTo, clearFailures, lockedForMinutes, recordFailure } from "@/lib/login-throttle";
 import { newPassword } from "@/lib/password";
 import { requireShop } from "@/lib/shop";
 import { createClient } from "@/lib/supabase/server";
@@ -51,21 +53,24 @@ export async function signOut() {
 }
 
 /**
- * "Forgot password": Supabase emails a one-time link that lands on
+ * "Forgot password": Petal emails a one-time link (via Resend) that lands on
  * /auth/confirm and then /reset-password. The reply is the same whether or
  * not the address has an account, so the form can't be used to probe emails.
  */
 export async function requestPasswordReset(_prev: FormState, formData: FormData): Promise<FormState> {
-  const email = z.string().trim().email().safeParse(formData.get("email"));
+  const email = z.string().trim().toLowerCase().email().safeParse(formData.get("email"));
   if (!email.success) return { error: "Enter the email you sign in with.", at: Date.now() };
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email.data, {
-    redirectTo: `${await siteOrigin()}/auth/confirm?next=/reset-password`,
-  });
-  // Rate limits are the one error worth showing; anything else stays generic.
-  if (error?.status === 429) {
-    return { error: "Too many emails sent. Wait a few minutes and try again.", at: Date.now() };
+  if (!(await allowEmailTo(email.data))) {
+    return { error: "We've just sent a few links to this address. Check your inbox, or try again in 15 minutes.", at: Date.now() };
+  }
+
+  try {
+    const { link } = await recoveryLink(email.data);
+    await sendEmail(email.data, resetPasswordEmail({ link, email: email.data }));
+  } catch (err) {
+    // No such account: stay silent (same reply). Anything else is logged for us.
+    if (!/not.*found|no user/i.test(String(err))) console.error("Password reset email failed", err);
   }
   return {
     done: `If ${email.data} has a Petal account, a link to set a new password is on its way. It works once and expires in an hour.`,

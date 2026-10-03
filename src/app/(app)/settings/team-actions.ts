@@ -5,11 +5,12 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { memberRole, shopMembers } from "@/db/schema";
-import { siteOrigin } from "@/lib/origin";
+import { inviteLink, recoveryLink } from "@/lib/auth-links";
+import { sendEmail } from "@/lib/email/send";
+import { inviteEmail } from "@/lib/email/templates";
 import { newPassword } from "@/lib/password";
 import { requireManager } from "@/lib/shop";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 export type TeamState = { error?: string; done?: string; at?: number };
 
@@ -48,7 +49,6 @@ export async function inviteMember(_prev: TeamState, formData: FormData): Promis
   if (existing?.shop_id) return { error: `${email} already belongs to another shop.`, at: Date.now() };
 
   const admin = supabaseAdmin();
-  const redirectTo = `${await siteOrigin()}/auth/confirm?next=/reset-password`;
   let userId = existing?.id;
 
   if (mode === "password") {
@@ -57,19 +57,18 @@ export async function inviteMember(_prev: TeamState, formData: FormData): Promis
       : await admin.auth.admin.createUser({ email, password: parsed.data.password, email_confirm: true });
     if (res.error) return { error: `Couldn't create the account: ${res.error.message}`, at: Date.now() };
     userId = res.data.user!.id;
-  } else if (!userId) {
-    // shop_name and role show up in the invitation email ({{ .Data.shop_name }}).
-    const res = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo,
-      data: { shop_name: shop.name, role },
-    });
-    if (res.error) return { error: inviteError(res.error.message), at: Date.now() };
-    userId = res.data.user.id;
   } else {
-    // Known address without a shop (e.g. removed earlier): send a set-password link.
-    const supabase = await createClient();
-    const res = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (res.error) return { error: inviteError(res.error.message), at: Date.now() };
+    // Petal emails the invitation itself (Resend). New address: a fresh
+    // invited account. Known address without a shop (e.g. removed earlier):
+    // a set-password link instead.
+    try {
+      const minted = userId ? await recoveryLink(email, true) : await inviteLink(email, { role });
+      userId = minted.userId;
+      await sendEmail(email, inviteEmail({ link: minted.link, email, shopName: shop.name }));
+    } catch (err) {
+      console.error("Invitation failed", err);
+      return { error: inviteError(String(err)), at: Date.now() };
+    }
   }
 
   await db.insert(shopMembers).values({ userId, shopId: shop.id, role });
@@ -84,8 +83,9 @@ export async function inviteMember(_prev: TeamState, formData: FormData): Promis
 }
 
 function inviteError(message: string) {
-  if (/rate limit/i.test(message)) return "Too many emails sent just now. Try again later, or set a password instead.";
-  return `Couldn't send the invitation (${message}). You can set a password instead.`;
+  if (/rate limit|429/i.test(message)) return "Too many emails sent just now. Try again later, or set a password instead.";
+  if (/RESEND_API_KEY/.test(message)) return "Email isn't set up yet. Use “Set a password now” for the moment.";
+  return "Couldn't send the invitation. You can set a password instead.";
 }
 
 /** Number of managers left if `userId` stopped being one. */
