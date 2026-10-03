@@ -4,6 +4,7 @@ import { PageTitle } from "@/components/page-title";
 import { db } from "@/db";
 import type { MemberRole } from "@/db/schema";
 import { requireShop } from "@/lib/shop";
+import { ReplayTourButton } from "../tour/tour";
 import { ChangePasswordForm } from "./change-password";
 import { DeleteAccount } from "./delete-account";
 import { DeliveriesSwitch } from "./feature-switch";
@@ -37,6 +38,9 @@ export default async function SettingsPage() {
             <span className="rounded-full bg-linen-deep px-3 py-1 font-mono text-[11px] uppercase tracking-[0.14em] text-soil-soft">
               {role}
             </span>
+          </div>
+          <div className="mt-6">
+            <ReplayTourButton />
           </div>
           <h3 className="mt-8 font-serif text-2xl">Change password</h3>
           <div className="mt-4">

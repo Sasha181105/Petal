@@ -11,6 +11,8 @@ export type ShopContext = {
   userId: string;
   email: string;
   role: MemberRole;
+  /** Has seen the first-run tour (stored on the account, so once per person). */
+  tourDone: boolean;
   shop: { id: string; name: string; currency: string; deliveriesEnabled: boolean };
 };
 
@@ -79,7 +81,7 @@ export const requireShop = cache(async (): Promise<ShopContext> => {
   }
 
   const { role, ...shop } = row;
-  return { userId: user.id, email: user.email ?? "", role, shop };
+  return { userId: user.id, email: user.email ?? "", role, tourDone: user.user_metadata?.tour_done === true, shop };
 });
 
 /** Like requireShop, but only for managers. Use in every manager-only action. */

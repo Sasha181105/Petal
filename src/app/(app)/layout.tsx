@@ -4,11 +4,12 @@ import { SiteFooter } from "@/components/site-footer";
 import { requireShop } from "@/lib/shop";
 import { signOut } from "../login/actions";
 import { BottomNav, TopNav } from "./bottom-nav";
+import { Tour } from "./tour/tour";
 
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const { shop, role } = await requireShop();
+  const { shop, role, tourDone } = await requireShop();
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-7xl flex-col px-5 md:px-10">
@@ -39,6 +40,8 @@ export default async function AppLayout({
       {/* Phone: bottom margin keeps the footer clear of the fixed nav. */}
       <SiteFooter className="mb-20 md:mb-0" />
       <BottomNav deliveriesEnabled={shop.deliveriesEnabled} isManager={role === "manager"} />
+      {/* Shown once on first sign-in; Settings can open it again. */}
+      <Tour isManager={role === "manager"} firstRun={!tourDone} />
     </div>
   );
 }
